@@ -9,13 +9,83 @@
 | **开始日期** | 2024-01-25 |
 | **技术栈** | Vue3 + FastAPI + SQLite + ChromaDB |
 | **仓库地址** | https://github.com/LWT1212/CareerPilot |
-| **本地路径** | ~/pyproject/Assistant |
 
 ---
 
-## Phase 0: 项目初始化
+## 📋 步骤概览（快速查找用）
 
-**状态**: ✅ 完成
+### Phase 0: 项目初始化 ✅
+| Step | 操作 | 状态 |
+|------|------|------|
+| 0.1 | 检查开发环境 | ✅ |
+| 0.2 | 创建GitHub仓库 | ✅ |
+| 0.3 | 更新 .gitignore | ✅ |
+| 0.4 | 配置Git用户信息 | ✅ |
+| 0.5 | 初始化Git仓库 | ✅ |
+| 0.6 | 添加远程仓库 | ✅ |
+| 0.7 | 添加文件并提交 | ✅ |
+| 0.8 | 推送到GitHub | ✅ |
+
+### Phase 1: 用户系统（待开始）
+| Step | 操作 | 状态 |
+|------|------|------|
+| 1.1 | 创建项目结构 | ⏳ |
+| 1.2 | 后端FastAPI初始化 | ⏳ |
+| 1.3 | 用户注册API | ⏳ |
+| 1.4 | 用户登录API | ⏳ |
+| 1.5 | JWT认证 | ⏳ |
+
+### Phase 2: 项目管理（待开始）
+| Step | 操作 | 状态 |
+|------|------|------|
+| 2.1 | 项目CRUD API | ⏳ |
+| 2.2 | 前端项目列表页 | ⏳ |
+
+### Phase 3: 聊天系统（待开始）
+| Step | 操作 | 状态 |
+|------|------|------|
+| 3.1 | 聊天CRUD API | ⏳ |
+| 3.2 | 消息流式响应 | ⏳ |
+| 3.3 | 前端聊天界面 | ⏳ |
+
+### Phase 4: 知识库RAG（待开始）
+| Step | 操作 | 状态 |
+|------|------|------|
+| 4.1 | 文档上传API | ⏳ |
+| 4.2 | 文档解析 | ⏳ |
+| 4.3 | 向量嵌入 | ⏳ |
+| 4.4 | RAG检索 | ⏳ |
+
+### Phase 5: 经验管理（待开始）
+### Phase 6: 面试模块（待开始）
+### Phase 7: 文档管理（待开始）
+### Phase 8: Multi-Agent系统（待开始）
+### Phase 9-10: 测试与部署（待开始）
+
+---
+
+## 🐛 遇到的问题
+
+| # | 问题 | 解决方案 | 状态 |
+|---|------|----------|------|
+| 1 | docker-compose命令不存在 | 使用 `docker compose` | ✅ |
+| 2 | Git remote添加失败 | 重新添加并验证 | ✅ |
+
+详细错误请查看 [ERRORS.md](ERRORS.md)
+
+---
+
+## 📋 技术决策
+
+| # | 决策 | 选择 | 原因 |
+|---|------|------|------|
+| 1 | LLM选型 | OpenAI + Ollama | 灵活，生产用OpenAI，开发用Ollama |
+| 2 | 数据库 | SQLite (V1) | 零配置，便于开发 |
+| 3 | Git工作流 | GitHub Flow | 流程简单，适合小团队 |
+
+---
+
+## 📖 详细步骤
 
 ---
 
@@ -75,6 +145,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+venv/
+.venv/
 
 # Node
 node_modules/
@@ -211,114 +283,6 @@ To https://github.com/LWT1212/CareerPilot.git
 
 ---
 
-## 遇到的问题
-
----
-
-### 🐛 Issue #1: docker-compose 命令不存在
-
-**时间**: 09:05
-**步骤**: Step 0.1
-**状态**: 🟢 已解决
-
-**错误命令**:
-```bash
-docker-compose --version
-```
-
-**错误输出**:
-```
-bash: docker-compose: command not found
-```
-
-**问题原因**: Docker 29.x 已内置 docker compose，不需要单独安装
-
-**解决方案**:
-```bash
-docker compose version
-```
-
-**经验**: 新版本软件可能改变命令行接口
-
----
-
-### 🐛 Issue #2: Git remote 添加失败
-
-**时间**: 10:20
-**步骤**: Step 0.8
-**状态**: 🟢 已解决
-
-**错误命令**:
-```bash
-git push -u origin main
-```
-
-**错误输出**:
-```
-fatal: 'origin' does not appear to be a git repository
-fatal: Could not read from remote repository.
-```
-
-**问题原因**: 远程仓库地址未正确添加
-
-**解决方案**:
-```bash
-git remote remove origin 2>/dev/null
-git remote add origin https://github.com/LWT1212/CareerPilot.git
-git remote -v  # 验证
-```
-
-**经验**: 添加远程仓库后，用 `git remote -v` 验证
-
----
-
-## 技术决策
-
----
-
-### 📋 Decision #1: LLM 选型
-
-**时间**: 09:00
-**背景**: 需要确定V1阶段使用哪个LLM
-
-**最终决定**: 同时支持 OpenAI 和 Ollama
-
-**原因**: 
-- OpenAI效果好，适合生产
-- Ollama免费，适合开发和隐私场景
-- 通过配置切换
-
----
-
-### 📋 Decision #2: 数据库选型
-
-**时间**: 09:00
-
-**最终决定**: V1使用SQLite，V2迁移到PostgreSQL
-
-**原因**: SQLite零配置，便于快速开发
-
----
-
-### 📋 Decision #3: Git工作流
-
-**时间**: 09:00
-
-**最终决定**: 使用 GitHub Flow
-
-**流程**: main → develop → feature/* → PR → Merge
-
----
-
 ## 下一步
 
-### Phase 0 剩余任务
-- [ ] 配置项目结构（前后端目录）
-- [ ] Docker环境搭建
-- [ ] 数据库初始化
-
-### Phase 1: 用户系统（待开始）
-- [ ] 后端FastAPI项目初始化
-- [ ] 用户注册/登录API
-- [ ] JWT认证
-- [ ] 前端登录页面
+（待记录）
