@@ -1,0 +1,82 @@
+# 知识库相关的API接口
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy.orm import Session
+from app.db import get_db
+from app.schemas.knowledge import (
+    KnowledgeDocumentResponse,
+    KnowledgeSearchRequest,
+    KnowledgeSearchResponse
+)
+from app.services.knowledge_service import (
+    upload_document,
+    get_documents,
+    get_document,
+    delete_document,
+    search_knowledge
+)
+
+# 创建路由
+router = APIRouter(prefix="/projects/{project_id}/knowledge", tags=["知识库"])
+
+
+# 上传文档
+@router.post("", response_model=KnowledgeDocumentResponse)
+def upload(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    上传知识文档
+    支持格式：PDF, Word, Markdown, TXT
+    """
+    # 读取文件内容
+    file_content = file.file.read()
+
+    # 获取文件类型
+    file_type = file.filename.split(".")[-1].lower()
+    if file_type not in ["pdf", "docx", "doc", "md", "txt"]:
+        raise HTTPException(status_code=400, detail="不支持的文件格式")
+
+    return upload_document(db, project_id, file.filename, file_content, file_type)
+
+
+# 获取文档列表
+@router.get("", response_model=list[KnowledgeDocumentResponse])
+def list_documents(project_id: str, skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
+    """获取知识库文档列表"""
+    docs, _ = get_documents(db, project_id, skip, limit)
+    return docs
+
+
+# 获取单个文档
+@router.get("/{doc_id}", response_model=KnowledgeDocumentResponse)
+def get(project_id: str, doc_id: str, db: Session = Depends(get_db)):
+    """获取文档详情"""
+    doc = get_document(db, doc_id, project_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    return doc
+
+
+# 删除文档
+@router.delete("/{doc_id}")
+def delete(project_id: str, doc_id: str, db: Session = Depends(get_db)):
+    """删除知识文档"""
+    success = delete_document(db, doc_id, project_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    return {"message": "删除成功"}
+
+
+# 知识检索
+@router.post("/search", response_model=KnowledgeSearchResponse)
+def search(project_id: str, search_data: KnowledgeSearchRequest, db: Session = Depends(get_db)):
+    """
+    知识检索（RAG）
+    - query: 搜索关键词
+    - top_k: 返回结果数量
+    """
+    results = search_knowledge(db, project_id, search_data.query, search_data.top_k)
+    return KnowledgeSearchResponse(
+        results=results,
+        query=search_data.query,
+        total_results=len(results)
+    )
