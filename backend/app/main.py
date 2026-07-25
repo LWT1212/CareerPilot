@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import settings
 
 app = FastAPI(
     title="CareerPilot AI",
@@ -8,10 +7,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,12 +17,10 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    """健康检查接口"""
     return {"status": "healthy", "service": "CareerPilot AI"}
 
 @app.get("/")
 async def root():
-    """根路径"""
     return {
         "name": "CareerPilot AI",
         "version": "1.0.0",

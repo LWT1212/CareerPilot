@@ -4,34 +4,34 @@ import os
 
 class Settings(BaseSettings):
     """应用配置"""
-    
-    # App
+
+    # 应用基本信息
     APP_NAME: str = "CareerPilot AI"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
-    
-    # Database
+
+    # 数据库配置
     DATABASE_URL: str = "sqlite:///./careerpilot.db"
-    
-    # LLM
-    LLM_PROVIDER: str = "openai"  # openai or ollama
+
+    # LLM配置（二选一）
+    LLM_PROVIDER: str = "openai"  # openai 或 ollama
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen"
-    
-    # JWT
+
+    # JWT认证配置
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 30
-    
-    # CORS
+
+    # CORS配置（允许前端访问）
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
-    
-    # File Upload
+
+    # 文件上传配置
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # 后端服务
   backend:
     build:
       context: ./backend
@@ -18,6 +19,7 @@ services:
       - chromadb
     restart: unless-stopped
 
+  # 向量数据库
   chromadb:
     image: chromadb/chroma:latest
     ports:
@@ -28,5 +30,6 @@ services:
       - IS_PERSISTENT=TRUE
     restart: unless-stopped
 
+# 定义数据卷
 volumes:
   chroma_data:
