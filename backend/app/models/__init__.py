@@ -1,4 +1,5 @@
-# 导入所有模型，让SQLAlchemy知道这些表
+# 导入所有模型
 from app.models.user import User
+from app.models.project import Project
 
-__all__ = ["User"]
+__all__ = ["User", "Project"]
