@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.projects import router as projects_router
+from app.api.v1.chats import router as chats_router, message_router
 from app.db import init_db
 
 # 创建FastAPI应用
@@ -24,6 +25,8 @@ app.add_middleware(
 # 注册路由
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
+app.include_router(chats_router, prefix="/api/v1")
+app.include_router(message_router, prefix="/api/v1")
 
 
 # 启动时初始化数据库
