@@ -8,6 +8,7 @@ from app.api.v1.knowledge import router as knowledge_router
 from app.api.v1.experiences import router as experiences_router
 from app.api.v1.interviews import router as interviews_router, question_router
 from app.api.v1.documents import router as documents_router
+from app.api.v1.agents import router as agents_router
 from app.db import init_db
 
 app = FastAPI(
@@ -33,6 +34,7 @@ app.include_router(experiences_router, prefix="/api/v1")
 app.include_router(interviews_router, prefix="/api/v1")
 app.include_router(question_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(agents_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
