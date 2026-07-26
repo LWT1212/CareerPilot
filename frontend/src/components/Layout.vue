@@ -1,35 +1,46 @@
-<!-- ChatGPT风格布局 - 按照设计图 -->
+<!-- ChatGPT风格布局 - 修复按钮点击 -->
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import api from '../api'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-const sidebarCollapsed = ref(false)
-const searchQuery = ref('')
+const projects = ref<any[]>([])
+const showNewProjectDialog = ref(false)
+const newProjectName = ref('')
 
-const navItems = [
-  { id: 'chat', icon: '💬', label: '聊天', path: '/' },
-]
+onMounted(async () => {
+  await loadProjects()
+})
 
-const projectItems = [
-  { id: 'career', icon: '📁', label: 'CareerPilot' },
-  { id: 'resume', icon: '📁', label: 'Resume' },
-  { id: 'vision', icon: '📁', label: 'Vision' },
-]
+const loadProjects = async () => {
+  try {
+    const response = await api.get('/projects')
+    projects.value = response.data.items || []
+  } catch (error) {
+    console.error('加载项目失败', error)
+  }
+}
 
-const bottomItems = [
-  { id: 'knowledge', icon: '📚', label: 'Knowledge Base' },
-  { id: 'global-kb', icon: '🌐', label: 'Global KB' },
-  { id: 'settings', icon: '⚙️', label: 'Settings', path: '/settings' },
-]
+const createProject = async () => {
+  if (!newProjectName.value.trim()) return
+  try {
+    await api.post('/projects', { name: newProjectName.value })
+    newProjectName.value = ''
+    showNewProjectDialog.value = false
+    await loadProjects()
+  } catch (error) {
+    console.error('创建项目失败', error)
+  }
+}
 
-const navigate = (path: string) => {
-  if (path) router.push(path)
+const navigateTo = (path: string) => {
+  router.push(path)
 }
 
 const logout = () => {
@@ -46,7 +57,6 @@ const logout = () => {
       <div class="sidebar-header">
         <div class="app-title">CareerPilot AI</div>
         <div class="header-actions">
-          <span class="search-icon">🔍</span>
           <div class="user-avatar" @click="logout">👤</div>
         </div>
       </div>
@@ -54,50 +64,50 @@ const logout = () => {
       <!-- 内容区 -->
       <div class="sidebar-content">
         <!-- 新建聊天 -->
-        <div class="new-chat-section">
-          <button class="new-chat-btn">+ New Chat</button>
-        </div>
+        <button class="new-chat-btn" @click="navigateTo('/')">
+          + New Chat
+        </button>
 
         <!-- 最近聊天 -->
         <div class="section">
           <div class="section-title">Recent Chats</div>
-          <div class="section-items">
-            <div class="nav-item">Redis是什么</div>
-            <div class="nav-item">LangGraph</div>
-            <div class="nav-item">MCP</div>
-          </div>
+          <div class="nav-item" @click="navigateTo('/')">Redis是什么</div>
+          <div class="nav-item" @click="navigateTo('/')">LangGraph</div>
+          <div class="nav-item" @click="navigateTo('/')">MCP</div>
         </div>
 
         <!-- 项目 -->
         <div class="section">
-          <div class="section-title">Projects</div>
-          <div class="section-items">
+          <div class="section-header">
+            <span class="section-title">Projects</span>
+            <button class="add-btn" @click="showNewProjectDialog = true">+</button>
+          </div>
+          <div class="project-list">
             <div
-              v-for="item in projectItems"
-              :key="item.id"
+              v-for="project in projects"
+              :key="project.id"
               class="nav-item project-item"
             >
-              <span class="nav-icon">{{ item.icon }}</span>
-              <span>{{ item.label }}</span>
+              <span class="nav-icon">📁</span>
+              <span>{{ project.name }}</span>
             </div>
+            <div v-if="projects.length === 0" class="empty-text">暂无项目</div>
           </div>
         </div>
 
         <!-- 知识库 -->
         <div class="section">
           <div class="section-title">Knowledge Base</div>
-          <div class="section-items">
-            <div class="nav-item">Global KB</div>
-          </div>
+          <div class="nav-item" @click="navigateTo('/knowledge')">📚 知识库</div>
         </div>
       </div>
 
       <!-- 底部设置 -->
       <div class="sidebar-footer">
-        <div class="nav-item" @click="navigate('/settings')">
-          <span class="nav-icon">⚙️</span>
-          <span>Settings</span>
-        </div>
+        <div class="nav-item" @click="navigateTo('/experience')">💡 经验</div>
+        <div class="nav-item" @click="navigateTo('/interview')">🎯 面试</div>
+        <div class="nav-item" @click="navigateTo('/documents')">📄 文档</div>
+        <div class="nav-item" @click="navigateTo('/settings')">⚙️ Settings</div>
       </div>
     </aside>
 
@@ -111,6 +121,18 @@ const logout = () => {
       <div class="panel-header">Context Panel</div>
       <slot name="context" />
     </aside>
+
+    <!-- 新建项目对话框 -->
+    <div v-if="showNewProjectDialog" class="dialog-overlay" @click.self="showNewProjectDialog = false">
+      <div class="dialog">
+        <h3>新建项目</h3>
+        <input v-model="newProjectName" placeholder="项目名称" @keyup.enter="createProject" />
+        <div class="dialog-actions">
+          <button class="cancel-btn" @click="showNewProjectDialog = false">取消</button>
+          <button class="confirm-btn" @click="createProject">创建</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -143,30 +165,16 @@ const logout = () => {
   color: #333;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.search-icon {
-  font-size: 18px;
-  cursor: pointer;
-}
-
 .user-avatar {
   font-size: 20px;
   cursor: pointer;
+  padding: 5px;
 }
 
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-}
-
-.new-chat-section {
-  margin-bottom: 20px;
 }
 
 .new-chat-btn {
@@ -179,6 +187,7 @@ const logout = () => {
   cursor: pointer;
   font-size: 14px;
   text-align: left;
+  margin-bottom: 20px;
 }
 
 .new-chat-btn:hover {
@@ -186,19 +195,32 @@ const logout = () => {
 }
 
 .section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .section-title {
   font-size: 12px;
   color: #999;
   margin-bottom: 8px;
-  padding: 0 8px;
 }
 
-.section-items {
-  display: flex;
-  flex-direction: column;
+.add-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 5px;
+}
+
+.add-btn:hover {
+  color: #000;
 }
 
 .nav-item {
@@ -216,17 +238,29 @@ const logout = () => {
   background: #f0f0f0;
 }
 
-.nav-icon {
-  font-size: 16px;
+.project-list {
+  display: flex;
+  flex-direction: column;
 }
 
 .project-item {
   font-size: 13px;
 }
 
+.empty-text {
+  color: #999;
+  font-size: 13px;
+  padding: 10px 8px;
+}
+
 .sidebar-footer {
-  padding: 16px;
+  padding: 12px 16px;
   border-top: 1px solid #e5e5e5;
+}
+
+.sidebar-footer .nav-item {
+  padding: 8px;
+  margin-bottom: 4px;
 }
 
 .main-content {
@@ -250,5 +284,68 @@ const logout = () => {
   font-size: 14px;
   color: #333;
   border-bottom: 1px solid #e5e5e5;
+}
+
+/* Dialog */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 400px;
+}
+
+.dialog h3 {
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.dialog input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 16px;
+}
+
+.dialog input:focus {
+  border-color: #000;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.confirm-btn {
+  padding: 8px 16px;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
 }
 </style>
