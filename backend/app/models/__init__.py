@@ -4,5 +4,6 @@ from app.models.project import Project
 from app.models.chat import Chat, Message
 from app.models.knowledge import KnowledgeDocument
 from app.models.experience import Experience
+from app.models.interview import Interview, InterviewQuestion
 
-__all__ = ["User", "Project", "Chat", "Message", "KnowledgeDocument", "Experience"]
+__all__ = ["User", "Project", "Chat", "Message", "KnowledgeDocument", "Experience", "Interview", "InterviewQuestion"]

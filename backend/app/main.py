@@ -6,6 +6,7 @@ from app.api.v1.projects import router as projects_router
 from app.api.v1.chats import router as chats_router, message_router
 from app.api.v1.knowledge import router as knowledge_router
 from app.api.v1.experiences import router as experiences_router
+from app.api.v1.interviews import router as interviews_router, question_router
 from app.db import init_db
 
 app = FastAPI(
@@ -28,6 +29,8 @@ app.include_router(chats_router, prefix="/api/v1")
 app.include_router(message_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
 app.include_router(experiences_router, prefix="/api/v1")
+app.include_router(interviews_router, prefix="/api/v1")
+app.include_router(question_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
