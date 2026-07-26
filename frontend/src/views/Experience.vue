@@ -1,44 +1,31 @@
-<!-- 经验管理页面 - 开发顺序：Step 9 -->
-<!-- 功能：查看经验列表，添加经验，按类型筛选 -->
+<!-- 经验管理页面 - ChatGPT风格 -->
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import Layout from '../components/Layout.vue'
 import { getExperiences, createExperience, deleteExperience } from '../api/experience'
 import { ElMessage } from 'element-plus'
 
-const route = useRoute()
-const projectId = route.params.id as string
-
 const experiences = ref<any[]>([])
 const loading = ref(false)
-const typeFilter = ref('')
 const showCreateDialog = ref(false)
-const newExperience = ref({
-  title: '',
-  type: 'bug',
-  content: '',
-  solution: '',
-  tags: []
-})
+const newExperience = ref({ title: '', type: 'bug', content: '', solution: '' })
 
 const types = [
   { value: 'bug', label: 'Bug' },
   { value: 'solution', label: '解决方案' },
   { value: 'architecture', label: '架构决策' },
   { value: 'lesson', label: '学习总结' },
-  { value: 'note', label: '笔记' }
 ]
 
 onMounted(async () => {
   await loadExperiences()
 })
 
-// 加载经验列表
 const loadExperiences = async () => {
   loading.value = true
   try {
-    const response = await getExperiences(projectId, typeFilter.value || undefined)
+    const response = await getExperiences('current')
     experiences.value = response.data
   } catch (error) {
     console.error('加载经验失败', error)
@@ -47,163 +34,205 @@ const loadExperiences = async () => {
   }
 }
 
-// 创建经验
 const handleCreate = async () => {
   try {
-    await createExperience(projectId, newExperience.value)
+    await createExperience('current', newExperience.value)
     ElMessage.success('创建成功')
     showCreateDialog.value = false
-    newExperience.value = { title: '', type: 'bug', content: '', solution: '', tags: [] }
+    newExperience.value = { title: '', type: 'bug', content: '', solution: '' }
     await loadExperiences()
   } catch (error) {
     ElMessage.error('创建失败')
   }
 }
 
-// 删除经验
-const handleDelete = async (expId: string) => {
+const handleDelete = async (id: string) => {
   try {
-    await deleteExperience(projectId, expId)
+    await deleteExperience('current', id)
     ElMessage.success('删除成功')
     await loadExperiences()
   } catch (error) {
     ElMessage.error('删除失败')
   }
 }
-
-// 筛选类型
-const handleFilter = () => {
-  loadExperiences()
-}
 </script>
 
 <template>
-  <div class="experience-page">
-    <!-- 头部 -->
-    <div class="header">
-      <h3>开发经验</h3>
-      <div class="actions">
-        <el-select v-model="typeFilter" placeholder="筛选类型" clearable @change="handleFilter">
-          <el-option v-for="t in types" :key="t.value" :label="t.label" :value="t.value" />
-        </el-select>
-        <el-button type="primary" @click="showCreateDialog = true">添加经验</el-button>
+  <Layout>
+    <div class="experience-page">
+      <div class="page-header">
+        <h1>💡 开发经验</h1>
+        <p>记录开发过程中的问题和解决方案</p>
+        <button class="add-btn" @click="showCreateDialog = true">+ 添加经验</button>
       </div>
-    </div>
 
-    <!-- 经验列表 -->
-    <div class="experience-list" v-loading="loading">
-      <div v-if="experiences.length === 0" class="empty">
-        <p>还没有经验记录</p>
-      </div>
-      <div v-for="exp in experiences" :key="exp.id" class="experience-item">
-        <div class="exp-header">
-          <h4>{{ exp.title }}</h4>
-          <div class="exp-meta">
-            <el-tag size="small">{{ exp.type }}</el-tag>
-            <el-button type="danger" size="small" @click="handleDelete(exp.id)">删除</el-button>
+      <div class="experience-list" v-loading="loading">
+        <div v-if="experiences.length === 0" class="empty">
+          <p>还没有经验记录</p>
+        </div>
+        <div v-for="exp in experiences" :key="exp.id" class="experience-item">
+          <div class="exp-header">
+            <div>
+              <span class="exp-type">{{ exp.type }}</span>
+              <h3>{{ exp.title }}</h3>
+            </div>
+            <button class="delete-btn" @click="handleDelete(exp.id)">×</button>
+          </div>
+          <p class="exp-content">{{ exp.content }}</p>
+          <div v-if="exp.solution" class="exp-solution">
+            <strong>解决方案：</strong>{{ exp.solution }}
           </div>
         </div>
-        <p class="exp-content">{{ exp.content }}</p>
-        <div v-if="exp.solution" class="exp-solution">
-          <strong>解决方案：</strong>{{ exp.solution }}
+      </div>
+
+      <!-- 创建对话框 -->
+      <div v-if="showCreateDialog" class="dialog-overlay" @click.self="showCreateDialog = false">
+        <div class="dialog">
+          <h2>添加经验</h2>
+          <input v-model="newExperience.title" placeholder="标题" />
+          <select v-model="newExperience.type">
+            <option v-for="t in types" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
+          <textarea v-model="newExperience.content" placeholder="详细描述" rows="4"></textarea>
+          <textarea v-model="newExperience.solution" placeholder="解决方案（可选）" rows="3"></textarea>
+          <div class="dialog-actions">
+            <button class="cancel-btn" @click="showCreateDialog = false">取消</button>
+            <button class="confirm-btn" @click="handleCreate">创建</button>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- 创建对话框 -->
-    <el-dialog v-model="showCreateDialog" title="添加经验">
-      <el-form :model="newExperience">
-        <el-form-item label="标题">
-          <el-input v-model="newExperience.title" placeholder="经验标题" />
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="newExperience.type">
-            <el-option v-for="t in types" :key="t.value" :label="t.label" :value="t.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="内容">
-          <el-input v-model="newExperience.content" type="textarea" :rows="4" placeholder="详细描述" />
-        </el-form-item>
-        <el-form-item label="解决方案">
-          <el-input v-model="newExperience.solution" type="textarea" :rows="3" placeholder="解决方案（可选）" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleCreate">创建</el-button>
-      </template>
-    </el-dialog>
-  </div>
+  </Layout>
 </template>
 
 <style scoped>
 .experience-page {
-  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
 }
 
-.header {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
 }
 
-.actions {
-  display: flex;
-  gap: 10px;
-}
+.page-header h1 { font-size: 28px; margin-bottom: 10px; }
+.page-header p { color: #8e8ea0; margin-bottom: 20px; }
 
-.experience-list {
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
+.add-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  cursor: pointer;
+  font-weight: bold;
 }
 
 .experience-item {
-  padding: 20px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.experience-item:last-child {
-  border-bottom: none;
+  background: #171717;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 15px;
 }
 
 .exp-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 10px;
 }
 
-.exp-header h4 {
-  margin: 0;
-  color: #333;
+.exp-type {
+  background: #343541;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #8e8ea0;
 }
 
-.exp-meta {
-  display: flex;
-  gap: 10px;
-  align-items: center;
+.exp-header h3 { margin: 8px 0 0 0; }
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #8e8ea0;
+  font-size: 20px;
+  cursor: pointer;
 }
 
-.exp-content {
-  color: #666;
-  margin-bottom: 10px;
-}
+.delete-btn:hover { color: #ef4444; }
+
+.exp-content { color: #ccc; line-height: 1.6; }
 
 .exp-solution {
-  background: #f0f9eb;
-  padding: 10px 15px;
-  border-radius: 6px;
+  background: #2a2a2a;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 12px;
   font-size: 14px;
 }
 
-.empty {
-  text-align: center;
-  color: #999;
-  padding: 40px;
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
+
+.dialog {
+  background: #171717;
+  border-radius: 12px;
+  padding: 30px;
+  width: 500px;
+}
+
+.dialog h2 { margin-bottom: 20px; }
+
+.dialog input, .dialog textarea, .dialog select {
+  width: 100%;
+  background: #40414f;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  color: #fff;
+  margin-bottom: 15px;
+  font-family: inherit;
+  outline: none;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancel-btn {
+  background: #2a2a2a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+.confirm-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.empty { text-align: center; color: #8e8ea0; padding: 60px; }
 </style>

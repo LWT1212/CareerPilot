@@ -1,14 +1,10 @@
-<!-- 文档管理页面 - 开发顺序：Step 11 -->
-<!-- 功能：查看文档，编辑文档，AI生成文档 -->
+<!-- 文档管理页面 - ChatGPT风格 -->
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import Layout from '../components/Layout.vue'
 import { getDocuments, getDocument, updateDocument, generateDocument } from '../api/document'
 import { ElMessage } from 'element-plus'
-
-const route = useRoute()
-const projectId = route.params.id as string
 
 const documents = ref<any[]>([])
 const currentDoc = ref<any>(null)
@@ -22,18 +18,16 @@ const docTypes = [
   { value: 'prd', label: 'PRD', icon: '📋' },
   { value: 'star', label: 'STAR', icon: '⭐' },
   { value: 'resume', label: '简历', icon: '📝' },
-  { value: 'project_intro', label: '项目介绍', icon: '介绍' }
 ]
 
 onMounted(async () => {
   await loadDocuments()
 })
 
-// 加载文档列表
 const loadDocuments = async () => {
   loading.value = true
   try {
-    const response = await getDocuments(projectId)
+    const response = await getDocuments('current')
     documents.value = response.data
   } catch (error) {
     console.error('加载文档失败', error)
@@ -42,27 +36,23 @@ const loadDocuments = async () => {
   }
 }
 
-// 查看文档
 const viewDocument = async (docType: string) => {
   try {
-    const response = await getDocument(projectId, docType)
+    const response = await getDocument('current', docType)
     currentDoc.value = response.data
     editContent.value = response.data.content || ''
     editing.value = false
   } catch (error) {
-    ElMessage.error('文档不存在')
+    currentDoc.value = { doc_type: docType, content: '文档不存在，点击"AI生成"创建', version: 0 }
+    editContent.value = ''
   }
 }
 
-// 开始编辑
-const startEdit = () => {
-  editing.value = true
-}
+const startEdit = () => { editing.value = true }
 
-// 保存文档
 const saveDocument = async () => {
   try {
-    await updateDocument(projectId, currentDoc.value.doc_type, editContent.value)
+    await updateDocument('current', currentDoc.value.doc_type, editContent.value)
     ElMessage.success('保存成功')
     editing.value = false
     await viewDocument(currentDoc.value.doc_type)
@@ -71,13 +61,11 @@ const saveDocument = async () => {
   }
 }
 
-// AI生成文档
 const handleGenerate = async (docType: string) => {
   generating.value = true
   try {
-    await generateDocument(projectId, docType, '根据项目信息自动生成')
+    await generateDocument('current', docType)
     ElMessage.success('生成成功')
-    await loadDocuments()
     await viewDocument(docType)
   } catch (error) {
     ElMessage.error('生成失败')
@@ -88,102 +76,102 @@ const handleGenerate = async (docType: string) => {
 </script>
 
 <template>
-  <div class="documents-page">
-    <!-- 文档类型列表 -->
-    <div class="doc-types">
-      <h3>项目文档</h3>
-      <div class="type-list">
-        <div
-          v-for="doc in docTypes"
-          :key="doc.value"
-          class="type-item"
-          :class="{ active: currentDoc?.doc_type === doc.value }"
-          @click="viewDocument(doc.value)"
-        >
-          <span class="icon">{{ doc.icon }}</span>
-          <span>{{ doc.label }}</span>
-        </div>
+  <Layout>
+    <div class="documents-page">
+      <div class="page-header">
+        <h1>📄 文档管理</h1>
+        <p>AI自动生成项目文档</p>
       </div>
-    </div>
 
-    <!-- 文档内容 -->
-    <div class="doc-content" v-if="currentDoc">
-      <div class="doc-header">
-        <h3>{{ currentDoc.doc_type.toUpperCase() }}</h3>
-        <div class="doc-actions">
-          <el-tag v-if="currentDoc.is_auto_generated" type="success">AI生成</el-tag>
-          <span class="version">v{{ currentDoc.version }}</span>
-          <el-button v-if="!editing" type="primary" size="small" @click="startEdit">编辑</el-button>
-          <el-button v-if="editing" type="success" size="small" @click="saveDocument">保存</el-button>
-          <el-button
-            type="warning"
-            size="small"
-            :loading="generating"
-            @click="handleGenerate(currentDoc.doc_type)"
+      <div class="doc-grid">
+        <!-- 文档类型列表 -->
+        <div class="doc-sidebar">
+          <div
+            v-for="doc in docTypes"
+            :key="doc.value"
+            class="doc-type-item"
+            :class="{ active: currentDoc?.doc_type === doc.value }"
+            @click="viewDocument(doc.value)"
           >
-            AI重新生成
-          </el-button>
+            <span class="doc-icon">{{ doc.icon }}</span>
+            <span>{{ doc.label }}</span>
+          </div>
+        </div>
+
+        <!-- 文档内容 -->
+        <div class="doc-content" v-if="currentDoc">
+          <div class="doc-header">
+            <h2>{{ currentDoc.doc_type?.toUpperCase() }}</h2>
+            <div class="doc-actions">
+              <span class="version" v-if="currentDoc.version">v{{ currentDoc.version }}</span>
+              <button v-if="!editing" class="edit-btn" @click="startEdit">编辑</button>
+              <button v-if="editing" class="save-btn" @click="saveDocument">保存</button>
+              <button class="generate-btn" :disabled="generating" @click="handleGenerate(currentDoc.doc_type)">
+                {{ generating ? '生成中...' : 'AI生成' }}
+              </button>
+            </div>
+          </div>
+          <div class="doc-body">
+            <textarea v-if="editing" v-model="editContent" class="edit-area"></textarea>
+            <div v-else class="doc-text">{{ currentDoc.content }}</div>
+          </div>
+        </div>
+
+        <div v-else class="doc-empty">
+          <p>选择左侧文档类型查看</p>
         </div>
       </div>
-      <div class="doc-body">
-        <textarea v-if="editing" v-model="editContent" class="edit-area"></textarea>
-        <div v-else class="markdown-content">{{ currentDoc.content }}</div>
-      </div>
     </div>
-
-    <div v-else class="empty">
-      <p>选择左侧文档类型查看内容</p>
-    </div>
-  </div>
+  </Layout>
 </template>
 
 <style scoped>
 .documents-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.page-header h1 { font-size: 28px; margin-bottom: 10px; }
+.page-header p { color: #8e8ea0; }
+
+.doc-grid {
   display: flex;
-  height: calc(100vh - 140px);
+  gap: 20px;
+  min-height: 500px;
 }
 
-.doc-types {
-  width: 200px;
-  background: white;
-  border-right: 1px solid #eee;
-  padding: 20px;
+.doc-sidebar {
+  width: 180px;
+  background: #171717;
+  border-radius: 12px;
+  padding: 15px;
 }
 
-.doc-types h3 {
-  margin-bottom: 20px;
-  color: #333;
-}
-
-.type-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.type-item {
+.doc-type-item {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 15px;
   border-radius: 8px;
   cursor: pointer;
+  margin-bottom: 5px;
   transition: background 0.2s;
 }
 
-.type-item:hover {
-  background: #f5f7fa;
-}
-
-.type-item.active {
-  background: #667eea;
-  color: white;
-}
+.doc-type-item:hover { background: #2a2a2a; }
+.doc-type-item.active { background: #343541; }
 
 .doc-content {
   flex: 1;
-  padding: 20px;
-  overflow-y: auto;
+  background: #171717;
+  border-radius: 12px;
+  padding: 25px;
 }
 
 .doc-header {
@@ -191,7 +179,11 @@ const handleGenerate = async (docType: string) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #2a2a2a;
 }
+
+.doc-header h2 { margin: 0; }
 
 .doc-actions {
   display: flex;
@@ -200,38 +192,52 @@ const handleGenerate = async (docType: string) => {
 }
 
 .version {
-  color: #999;
+  color: #8e8ea0;
   font-size: 12px;
 }
 
-.doc-body {
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
-  min-height: 400px;
+.edit-btn, .save-btn, .generate-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
 }
+
+.edit-btn { background: #40414f; color: #fff; }
+.save-btn { background: #10b981; color: #fff; }
+.generate-btn { background: #fff; color: #000; font-weight: bold; }
+.generate-btn:disabled { opacity: 0.5; }
+
+.doc-body { min-height: 400px; }
 
 .edit-area {
   width: 100%;
   min-height: 400px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  background: #40414f;
+  border: none;
+  border-radius: 8px;
   padding: 15px;
+  color: #fff;
   font-family: inherit;
   font-size: 14px;
   resize: vertical;
+  outline: none;
 }
 
-.markdown-content {
+.doc-text {
   white-space: pre-wrap;
-  line-height: 1.6;
+  line-height: 1.7;
+  color: #ccc;
 }
 
-.empty {
+.doc-empty {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999;
+  background: #171717;
+  border-radius: 12px;
+  color: #8e8ea0;
 }
 </style>

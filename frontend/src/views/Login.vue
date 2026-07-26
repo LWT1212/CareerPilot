@@ -1,3 +1,5 @@
+<!-- 登录页面 - ChatGPT风格 -->
+
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -32,69 +34,136 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="login-container">
+  <div class="login-page">
     <div class="login-card">
-      <h1>CareerPilot AI</h1>
-      <p>基于Multi-Agent的长期项目成长助手</p>
+      <div class="logo">
+        <span class="logo-icon">🤖</span>
+        <h1>CareerPilot AI</h1>
+        <p>基于Multi-Agent的长期项目成长助手</p>
+      </div>
 
-      <el-form :model="form" @submit.prevent="handleSubmit">
-        <el-form-item v-if="!isLogin">
-          <el-input v-model="form.username" placeholder="用户名" />
-        </el-form-item>
-        <el-form-item>
-          <el-input v-model="form.email" placeholder="邮箱" type="email" />
-        </el-form-item>
-        <el-form-item>
-          <el-input v-model="form.password" placeholder="密码" type="password" />
-        </el-form-item>
-        <el-button type="primary" native-type="submit" style="width: 100%">
+      <form @submit.prevent="handleSubmit">
+        <input
+          v-if="!isLogin"
+          v-model="form.username"
+          type="text"
+          placeholder="用户名"
+        />
+        <input
+          v-model="form.email"
+          type="email"
+          placeholder="邮箱地址"
+        />
+        <input
+          v-model="form.password"
+          type="password"
+          placeholder="密码"
+        />
+        <button type="submit" class="submit-btn">
           {{ isLogin ? '登录' : '注册' }}
-        </el-button>
-      </el-form>
+        </button>
+      </form>
 
-      <p class="toggle" @click="isLogin = !isLogin">
-        {{ isLogin ? '没有账号？立即注册' : '已有账号？立即登录' }}
+      <p class="toggle">
+        {{ isLogin ? '没有账号？' : '已有账号？' }}
+        <a @click="isLogin = !isLogin">
+          {{ isLogin ? '立即注册' : '立即登录' }}
+        </a>
       </p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #212121;
 }
 
 .login-card {
-  background: white;
-  padding: 40px;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   width: 400px;
+  padding: 40px;
 }
 
-h1 {
+.logo {
   text-align: center;
-  margin-bottom: 10px;
-  color: #333;
+  margin-bottom: 40px;
 }
 
-p {
-  text-align: center;
-  color: #666;
-  margin-bottom: 30px;
+.logo-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 15px;
+}
+
+.logo h1 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.logo p {
+  color: #8e8ea0;
+  font-size: 14px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+input {
+  background: #40414f;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  border-color: #fff;
+}
+
+input::placeholder {
+  color: #8e8ea0;
+}
+
+.submit-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  margin-top: 10px;
+}
+
+.submit-btn:hover {
+  opacity: 0.9;
 }
 
 .toggle {
-  cursor: pointer;
-  color: #667eea;
-  margin-top: 20px;
+  text-align: center;
+  color: #8e8ea0;
+  margin-top: 25px;
+  font-size: 14px;
 }
 
-.toggle:hover {
+.toggle a {
+  color: #fff;
+  cursor: pointer;
+}
+
+.toggle a:hover {
   text-decoration: underline;
 }
 </style>

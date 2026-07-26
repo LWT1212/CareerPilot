@@ -1,44 +1,26 @@
-<!-- 面试模块页面 - 开发顺序：Step 10 -->
-<!-- 功能：查看面试列表，添加面试，查看统计 -->
+<!-- 面试模块页面 - ChatGPT风格 -->
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import Layout from '../components/Layout.vue'
 import { getInterviews, createInterview, deleteInterview, getInterviewStats } from '../api/interview'
 import { ElMessage } from 'element-plus'
-
-const route = useRoute()
-const projectId = route.params.id as string
 
 const interviews = ref<any[]>([])
 const stats = ref<any>(null)
 const loading = ref(false)
 const showCreateDialog = ref(false)
-const newInterview = ref({
-  company: '',
-  position: '',
-  interview_date: '',
-  result: '',
-  overall_feedback: ''
-})
-
-const results = [
-  { value: 'offer', label: 'Offer' },
-  { value: 'rejected', label: '被拒' },
-  { value: 'pending', label: '待定' },
-  { value: 'ghosted', label: '无回复' }
-]
+const newInterview = ref({ company: '', position: '', interview_date: '', result: '', overall_feedback: '' })
 
 onMounted(async () => {
   await loadInterviews()
   await loadStats()
 })
 
-// 加载面试列表
 const loadInterviews = async () => {
   loading.value = true
   try {
-    const response = await getInterviews(projectId)
+    const response = await getInterviews('current')
     interviews.value = response.data
   } catch (error) {
     console.error('加载面试失败', error)
@@ -47,20 +29,18 @@ const loadInterviews = async () => {
   }
 }
 
-// 加载统计
 const loadStats = async () => {
   try {
-    const response = await getInterviewStats(projectId)
+    const response = await getInterviewStats('current')
     stats.value = response.data
   } catch (error) {
     console.error('加载统计失败', error)
   }
 }
 
-// 创建面试
 const handleCreate = async () => {
   try {
-    await createInterview(projectId, newInterview.value)
+    await createInterview('current', newInterview.value)
     ElMessage.success('创建成功')
     showCreateDialog.value = false
     newInterview.value = { company: '', position: '', interview_date: '', result: '', overall_feedback: '' }
@@ -71,10 +51,9 @@ const handleCreate = async () => {
   }
 }
 
-// 删除面试
 const handleDelete = async (id: string) => {
   try {
-    await deleteInterview(projectId, id)
+    await deleteInterview('current', id)
     ElMessage.success('删除成功')
     await loadInterviews()
     await loadStats()
@@ -85,188 +64,266 @@ const handleDelete = async (id: string) => {
 </script>
 
 <template>
-  <div class="interview-page">
-    <!-- 统计卡片 -->
-    <div class="stats-section" v-if="stats">
-      <div class="stat-card">
-        <h4>面试总数</h4>
-        <p>{{ stats.total_interviews }}</p>
+  <Layout>
+    <div class="interview-page">
+      <div class="page-header">
+        <h1>🎯 面试管理</h1>
+        <p>记录面试经历，持续提升</p>
+        <button class="add-btn" @click="showCreateDialog = true">+ 添加面试</button>
       </div>
-      <div class="stat-card">
-        <h4>问题总数</h4>
-        <p>{{ stats.total_questions }}</p>
-      </div>
-      <div class="stat-card">
-        <h4>薄弱领域</h4>
-        <p>{{ stats.weak_areas.length }}</p>
-      </div>
-    </div>
 
-    <!-- 头部 -->
-    <div class="header">
-      <h3>面试记录</h3>
-      <el-button type="primary" @click="showCreateDialog = true">添加面试</el-button>
-    </div>
-
-    <!-- 面试列表 -->
-    <div class="interview-list" v-loading="loading">
-      <div v-if="interviews.length === 0" class="empty">
-        <p>还没有面试记录</p>
-      </div>
-      <div v-for="item in interviews" :key="item.id" class="interview-item">
-        <div class="item-header">
-          <h4>{{ item.company }} - {{ item.position }}</h4>
-          <el-button type="danger" size="small" @click="handleDelete(item.id)">删除</el-button>
+      <!-- 统计卡片 -->
+      <div class="stats-grid" v-if="stats">
+        <div class="stat-card">
+          <span class="stat-value">{{ stats.total_interviews }}</span>
+          <span class="stat-label">面试总数</span>
         </div>
-        <div class="item-meta">
-          <span v-if="item.interview_date">📅 {{ item.interview_date }}</span>
-          <el-tag v-if="item.result" :type="item.result === 'offer' ? 'success' : 'danger'">
-            {{ item.result }}
-          </el-tag>
+        <div class="stat-card">
+          <span class="stat-value">{{ stats.total_questions }}</span>
+          <span class="stat-label">问题总数</span>
         </div>
-        <p v-if="item.overall_feedback" class="feedback">{{ item.overall_feedback }}</p>
-      </div>
-    </div>
-
-    <!-- 薄弱领域 -->
-    <div class="weak-section" v-if="stats && stats.weak_areas.length > 0">
-      <h3>薄弱领域</h3>
-      <div class="weak-list">
-        <div v-for="weak in stats.weak_areas" :key="weak.category" class="weak-item">
-          <span>{{ weak.category }}</span>
-          <el-tag type="danger">{{ weak.count }} 个问题</el-tag>
+        <div class="stat-card">
+          <span class="stat-value">{{ stats.weak_areas.length }}</span>
+          <span class="stat-label">薄弱领域</span>
         </div>
       </div>
-    </div>
 
-    <!-- 创建对话框 -->
-    <el-dialog v-model="showCreateDialog" title="添加面试记录">
-      <el-form :model="newInterview">
-        <el-form-item label="公司">
-          <el-input v-model="newInterview.company" placeholder="公司名称" />
-        </el-form-item>
-        <el-form-item label="职位">
-          <el-input v-model="newInterview.position" placeholder="应聘职位" />
-        </el-form-item>
-        <el-form-item label="面试日期">
-          <el-date-picker v-model="newInterview.interview_date" type="date" placeholder="选择日期" />
-        </el-form-item>
-        <el-form-item label="结果">
-          <el-select v-model="newInterview.result" placeholder="选择结果">
-            <el-option v-for="r in results" :key="r.value" :label="r.label" :value="r.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="反馈">
-          <el-input v-model="newInterview.overall_feedback" type="textarea" placeholder="面试反馈" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleCreate">创建</el-button>
-      </template>
-    </el-dialog>
-  </div>
+      <!-- 面试列表 -->
+      <div class="interview-list" v-loading="loading">
+        <div v-if="interviews.length === 0" class="empty">
+          <p>还没有面试记录</p>
+        </div>
+        <div v-for="item in interviews" :key="item.id" class="interview-item">
+          <div class="item-header">
+            <div>
+              <h3>{{ item.company }}</h3>
+              <p>{{ item.position }}</p>
+            </div>
+            <button class="delete-btn" @click="handleDelete(item.id)">×</button>
+          </div>
+          <div class="item-meta">
+            <span v-if="item.interview_date">📅 {{ item.interview_date }}</span>
+            <span v-if="item.result" class="result-badge" :class="item.result">{{ item.result }}</span>
+          </div>
+          <p v-if="item.overall_feedback" class="feedback">{{ item.overall_feedback }}</p>
+        </div>
+      </div>
+
+      <!-- 薄弱领域 -->
+      <div class="weak-section" v-if="stats && stats.weak_areas.length > 0">
+        <h2>⚠️ 薄弱领域</h2>
+        <div class="weak-list">
+          <div v-for="weak in stats.weak_areas" :key="weak.category" class="weak-item">
+            <span>{{ weak.category }}</span>
+            <span class="weak-count">{{ weak.count }} 个问题</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 创建对话框 -->
+      <div v-if="showCreateDialog" class="dialog-overlay" @click.self="showCreateDialog = false">
+        <div class="dialog">
+          <h2>添加面试记录</h2>
+          <input v-model="newInterview.company" placeholder="公司名称" />
+          <input v-model="newInterview.position" placeholder="应聘职位" />
+          <input v-model="newInterview.interview_date" type="date" />
+          <select v-model="newInterview.result">
+            <option value="">选择结果</option>
+            <option value="offer">Offer</option>
+            <option value="rejected">被拒</option>
+            <option value="pending">待定</option>
+          </select>
+          <textarea v-model="newInterview.overall_feedback" placeholder="面试反馈" rows="3"></textarea>
+          <div class="dialog-actions">
+            <button class="cancel-btn" @click="showCreateDialog = false">取消</button>
+            <button class="confirm-btn" @click="handleCreate">创建</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Layout>
 </template>
 
 <style scoped>
 .interview-page {
-  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
 }
 
-.stats-section {
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.page-header h1 { font-size: 28px; margin-bottom: 10px; }
+.page-header p { color: #8e8ea0; margin-bottom: 20px; }
+
+.add-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
-  margin-bottom: 20px;
+  margin-bottom: 40px;
 }
 
 .stat-card {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
+  background: #171717;
+  border-radius: 12px;
+  padding: 25px;
   text-align: center;
 }
 
-.stat-card h4 {
-  color: #666;
-  margin-bottom: 10px;
-}
-
-.stat-card p {
-  font-size: 24px;
-  color: #667eea;
+.stat-value {
+  display: block;
+  font-size: 32px;
   font-weight: bold;
-  margin: 0;
+  color: #fff;
+  margin-bottom: 5px;
 }
 
-.header {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.interview-list {
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
-  margin-bottom: 20px;
+.stat-label {
+  color: #8e8ea0;
+  font-size: 14px;
 }
 
 .interview-item {
-  padding: 20px 0;
-  border-bottom: 1px solid #eee;
+  background: #171717;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 15px;
 }
 
 .item-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 10px;
 }
+
+.item-header h3 { margin: 0; }
+.item-header p { color: #8e8ea0; margin: 5px 0 0 0; }
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #8e8ea0;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.delete-btn:hover { color: #ef4444; }
 
 .item-meta {
   display: flex;
   gap: 15px;
   align-items: center;
-  margin-bottom: 10px;
-  color: #666;
+  color: #8e8ea0;
   font-size: 14px;
+  margin-bottom: 10px;
 }
 
-.feedback {
-  color: #666;
-  font-style: italic;
+.result-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  text-transform: uppercase;
 }
+
+.result-badge.offer { background: #065f46; color: #10b981; }
+.result-badge.rejected { background: #7f1d1d; color: #ef4444; }
+.result-badge.pending { background: #78350f; color: #f59e0b; }
+
+.feedback { color: #ccc; font-style: italic; }
 
 .weak-section {
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
+  background: #171717;
+  border-radius: 12px;
+  padding: 25px;
+  margin-top: 30px;
 }
 
-.weak-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 15px;
-}
+.weak-section h2 { font-size: 18px; margin-bottom: 20px; }
+
+.weak-list { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .weak-item {
+  background: #7f1d1d;
+  padding: 10px 16px;
+  border-radius: 8px;
   display: flex;
-  align-items: center;
   gap: 10px;
-  padding: 10px 15px;
-  background: #fef0f0;
-  border-radius: 6px;
+  align-items: center;
 }
 
-.empty {
-  text-align: center;
-  color: #999;
-  padding: 40px;
+.weak-count { color: #fca5a5; font-size: 12px; }
+
+/* Dialog styles */
+.dialog-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
+
+.dialog {
+  background: #171717;
+  border-radius: 12px;
+  padding: 30px;
+  width: 500px;
+}
+
+.dialog h2 { margin-bottom: 20px; }
+
+.dialog input, .dialog textarea, .dialog select {
+  width: 100%;
+  background: #40414f;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  color: #fff;
+  margin-bottom: 15px;
+  font-family: inherit;
+  outline: none;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancel-btn {
+  background: #2a2a2a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+.confirm-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.empty { text-align: center; color: #8e8ea0; padding: 60px; }
 </style>

@@ -1,4 +1,4 @@
-// 路由配置 - 前端开发顺序：Step 2
+// 路由配置
 
 import { createRouter, createWebHistory } from 'vue-router'
 
@@ -12,42 +12,30 @@ const router = createRouter({
     },
     {
       path: '/',
-      name: 'Home',
-      component: () => import('../views/Home.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/projects/:id',
-      name: 'Project',
-      component: () => import('../views/Project.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/projects/:id/chat',
       name: 'Chat',
       component: () => import('../views/Chat.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/projects/:id/knowledge',
+      path: '/knowledge',
       name: 'Knowledge',
       component: () => import('../views/Knowledge.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/projects/:id/experience',
+      path: '/experience',
       name: 'Experience',
       component: () => import('../views/Experience.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/projects/:id/interview',
+      path: '/interview',
       name: 'Interview',
       component: () => import('../views/Interview.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/projects/:id/documents',
+      path: '/documents',
       name: 'Documents',
       component: () => import('../views/Documents.vue'),
       meta: { requiresAuth: true },
