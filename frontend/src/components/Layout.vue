@@ -1,7 +1,7 @@
-<!-- ChatGPT风格布局 - 主布局组件 -->
+<!-- ChatGPT风格布局 - 按照设计图 -->
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -10,29 +10,28 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const sidebarCollapsed = ref(false)
-const activeMenu = ref('chat')
+const searchQuery = ref('')
 
-// 菜单项
-const menuItems = [
-  { id: 'chat', icon: '💬', label: '聊天', path: '/chat' },
-  { id: 'knowledge', icon: '📚', label: '知识库', path: '/knowledge' },
-  { id: 'experience', icon: '💡', label: '经验', path: '/experience' },
-  { id: 'interview', icon: '🎯', label: '面试', path: '/interview' },
-  { id: 'documents', icon: '📄', label: '文档', path: '/documents' },
+const navItems = [
+  { id: 'chat', icon: '💬', label: '聊天', path: '/' },
 ]
 
-// 切换侧边栏
-const toggleSidebar = () => {
-  sidebarCollapsed.value = !sidebarCollapsed.value
-}
+const projectItems = [
+  { id: 'career', icon: '📁', label: 'CareerPilot' },
+  { id: 'resume', icon: '📁', label: 'Resume' },
+  { id: 'vision', icon: '📁', label: 'Vision' },
+]
 
-// 导航
+const bottomItems = [
+  { id: 'knowledge', icon: '📚', label: 'Knowledge Base' },
+  { id: 'global-kb', icon: '🌐', label: 'Global KB' },
+  { id: 'settings', icon: '⚙️', label: 'Settings', path: '/settings' },
+]
+
 const navigate = (path: string) => {
-  activeMenu.value = path.substring(1)
-  router.push(path)
+  if (path) router.push(path)
 }
 
-// 退出登录
 const logout = () => {
   authStore.logout()
   router.push('/login')
@@ -42,32 +41,63 @@ const logout = () => {
 <template>
   <div class="layout">
     <!-- 侧边栏 -->
-    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+    <aside class="sidebar">
+      <!-- 头部 -->
       <div class="sidebar-header">
-        <button class="toggle-btn" @click="toggleSidebar">
-          {{ sidebarCollapsed ? '☰' : '✕' }}
-        </button>
-        <span v-if="!sidebarCollapsed" class="logo">CareerPilot AI</span>
+        <div class="app-title">CareerPilot AI</div>
+        <div class="header-actions">
+          <span class="search-icon">🔍</span>
+          <div class="user-avatar" @click="logout">👤</div>
+        </div>
       </div>
 
-      <nav class="sidebar-nav" v-if="!sidebarCollapsed">
-        <div
-          v-for="item in menuItems"
-          :key="item.id"
-          class="nav-item"
-          :class="{ active: activeMenu === item.id }"
-          @click="navigate(item.path)"
-        >
-          <span class="nav-icon">{{ item.icon }}</span>
-          <span class="nav-label">{{ item.label }}</span>
+      <!-- 内容区 -->
+      <div class="sidebar-content">
+        <!-- 新建聊天 -->
+        <div class="new-chat-section">
+          <button class="new-chat-btn">+ New Chat</button>
         </div>
-      </nav>
 
-      <div class="sidebar-footer" v-if="!sidebarCollapsed">
-        <div class="user-info">
-          <span>{{ authStore.user?.username || '用户' }}</span>
+        <!-- 最近聊天 -->
+        <div class="section">
+          <div class="section-title">Recent Chats</div>
+          <div class="section-items">
+            <div class="nav-item">Redis是什么</div>
+            <div class="nav-item">LangGraph</div>
+            <div class="nav-item">MCP</div>
+          </div>
         </div>
-        <button class="logout-btn" @click="logout">退出</button>
+
+        <!-- 项目 -->
+        <div class="section">
+          <div class="section-title">Projects</div>
+          <div class="section-items">
+            <div
+              v-for="item in projectItems"
+              :key="item.id"
+              class="nav-item project-item"
+            >
+              <span class="nav-icon">{{ item.icon }}</span>
+              <span>{{ item.label }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 知识库 -->
+        <div class="section">
+          <div class="section-title">Knowledge Base</div>
+          <div class="section-items">
+            <div class="nav-item">Global KB</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部设置 -->
+      <div class="sidebar-footer">
+        <div class="nav-item" @click="navigate('/settings')">
+          <span class="nav-icon">⚙️</span>
+          <span>Settings</span>
+        </div>
       </div>
     </aside>
 
@@ -75,6 +105,12 @@ const logout = () => {
     <main class="main-content">
       <slot />
     </main>
+
+    <!-- 右侧面板 -->
+    <aside class="context-panel">
+      <div class="panel-header">Context Panel</div>
+      <slot name="context" />
+    </aside>
   </div>
 </template>
 
@@ -82,107 +118,137 @@ const logout = () => {
 .layout {
   display: flex;
   height: 100vh;
+  background: #f5f5f5;
 }
 
 .sidebar {
   width: 260px;
-  background: #171717;
+  background: #fff;
+  border-right: 1px solid #e5e5e5;
   display: flex;
   flex-direction: column;
-  transition: width 0.3s;
-}
-
-.sidebar.collapsed {
-  width: 60px;
 }
 
 .sidebar-header {
-  padding: 15px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.app-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+}
+
+.header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid #2a2a2a;
+  gap: 12px;
 }
 
-.toggle-btn {
-  background: none;
-  border: none;
-  color: #fff;
+.search-icon {
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.user-avatar {
   font-size: 20px;
   cursor: pointer;
-  padding: 5px;
 }
 
-.logo {
-  font-size: 16px;
-  font-weight: bold;
-  color: #fff;
-}
-
-.sidebar-nav {
+.sidebar-content {
   flex: 1;
-  padding: 10px;
   overflow-y: auto;
+  padding: 16px;
+}
+
+.new-chat-section {
+  margin-bottom: 20px;
+}
+
+.new-chat-btn {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px dashed #d0d0d0;
+  border-radius: 8px;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.new-chat-btn:hover {
+  background: #f5f5f5;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 8px;
+  padding: 0 8px;
+}
+
+.section-items {
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 15px;
-  border-radius: 8px;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background 0.2s;
-  margin-bottom: 5px;
+  font-size: 14px;
+  color: #333;
 }
 
 .nav-item:hover {
-  background: #2a2a2a;
-}
-
-.nav-item.active {
-  background: #343541;
+  background: #f0f0f0;
 }
 
 .nav-icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
-.nav-label {
-  font-size: 14px;
+.project-item {
+  font-size: 13px;
 }
 
 .sidebar-footer {
-  padding: 15px;
-  border-top: 1px solid #2a2a2a;
-}
-
-.user-info {
-  font-size: 14px;
-  color: #999;
-  margin-bottom: 10px;
-}
-
-.logout-btn {
-  width: 100%;
-  padding: 8px;
-  background: #2a2a2a;
-  border: none;
-  border-radius: 6px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.logout-btn:hover {
-  background: #3a3a3a;
+  padding: 16px;
+  border-top: 1px solid #e5e5e5;
 }
 
 .main-content {
   flex: 1;
-  background: #212121;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.context-panel {
+  width: 280px;
+  background: #fff;
+  border-left: 1px solid #e5e5e5;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 16px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  border-bottom: 1px solid #e5e5e5;
 }
 </style>
