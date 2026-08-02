@@ -52,7 +52,7 @@ const navigateTo = (path: string) => {
 // 选择项目（跳转到聊天）
 const selectProject = (id: string) => {
   localStorage.setItem('current_project_id', id)
-  navigateTo('/')
+  router.push({ path: '/', query: { project: id } })
 }
 
 // 退出登录

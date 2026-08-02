@@ -2,9 +2,12 @@
 <!-- 中间聊天窗口：支持普通聊天、RAG、多Agent -->
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
 import { getMessages, sendMessage, createChat, getChats } from '../api/chat'
+
+const route = useRoute()
 
 const chats = ref<any[]>([])
 const currentChat = ref<any>(null)
@@ -18,6 +21,20 @@ const projectId = ref<string>(localStorage.getItem('current_project_id') || '')
 onMounted(async () => {
   await loadChats()
 })
+
+// 监听路由参数变化（点击侧边栏项目时触发）
+watch(
+  () => route.query.project,
+  (newVal) => {
+    if (newVal) {
+      projectId.value = newVal as string
+      localStorage.setItem('current_project_id', projectId.value)
+      currentChat.value = null
+      messages.value = []
+      loadChats()
+    }
+  }
+)
 
 // 加载聊天列表
 const loadChats = async () => {
