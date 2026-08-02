@@ -1,6 +1,7 @@
 # 聊天相关的API接口
 # 支持：全局聊天（不隶属项目）+ 项目聊天
 
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db import get_db
@@ -16,7 +17,7 @@ from app.services.chat_service import (
     get_messages,
     messages_to_llm_history
 )
-from app.services.llm_service import chat_completion
+from app.services.llm_service import chat_completion, stream_completion
 
 # 全局聊天路由
 router = APIRouter(prefix="/chats", tags=["全局聊天"])
@@ -115,3 +116,44 @@ def list_messages(chat_id: str, skip: int = 0, limit: int = 50, db: Session = De
     """获取聊天消息列表"""
     messages, total = get_messages(db, chat_id, skip, limit)
     return MessageListResponse(items=messages, total=total)
+
+
+# 流式发送消息（SSE）
+@message_router.post("/stream")
+async def stream_send(chat_id: str, message_data: MessageCreate, db: Session = Depends(get_db)):
+    """
+    流式发送消息（SSE）
+    前端实时显示AI逐字回复
+    """
+    from fastapi.responses import StreamingResponse
+
+    # 1. 保存用户消息
+    send_message(db, chat_id, message_data)
+
+    # 2. 获取历史消息
+    history = messages_to_llm_history(db, chat_id)
+
+    async def event_generator():
+        full_content = ""
+        try:
+            # 流式获取LLM回复
+            async for chunk in stream_completion(history, message_data.content):
+                full_content += chunk
+                # SSE格式：data: {...}\n\n
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+        except Exception as e:
+            print(f"LLM流式调用失败: {e}")
+            error_msg = "（AI服务暂时不可用，请检查LLM配置）"
+            full_content = error_msg
+            yield f"data: {json.dumps({'type': 'chunk', 'content': error_msg})}\n\n"
+
+        # 3. 保存完整的AI回复
+        ai_reply(db, chat_id, full_content, "llm")
+        # 发送完成事件
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
