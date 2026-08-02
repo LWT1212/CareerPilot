@@ -1,5 +1,4 @@
-<!-- 聊天页面 - 使用全局项目状态 -->
-<!-- 支持：普通聊天 / RAG知识检索 / 多Agent协作 -->
+<!-- 聊天页面 - 直接使用Store状态，保证数据隔离和响应式 -->
 
 <script setup lang="ts">
 import { onMounted, watch, nextTick, ref } from 'vue'
@@ -12,47 +11,51 @@ const inputMessage = ref('')
 const loading = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
-const projectId = ref(projectStore.currentProjectId)
-const messages = ref(projectStore.messages)
-const currentChat = ref(projectStore.currentChat)
+// 页面挂载时恢复当前项目状态
+onMounted(async () => {
+  if (!projectStore.currentProjectId) return
+  // 如果没有聊天列表，加载
+  if (projectStore.chats.length === 0) {
+    await projectStore.loadChats()
+  }
+  // 如果没有选中聊天且有聊天，自动选中第一个
+  if (!projectStore.currentChat && projectStore.chats.length > 0) {
+    await projectStore.selectChat(projectStore.chats[0])
+  }
+  scrollToBottom()
+})
 
-// 监听项目切换（点击侧边栏项目时触发）
+// 监听当前项目变化 → 清空消息
 watch(
   () => projectStore.currentProjectId,
-  (newId) => {
-    projectId.value = newId
-    messages.value = projectStore.messages
+  () => {
     scrollToBottom()
   }
 )
 
-// 监听聊天切换
+// 监听当前聊天变化 → 滚动到底部
 watch(
-  () => projectStore.currentChat,
-  (chat) => {
-    currentChat.value = chat
-    messages.value = projectStore.messages
+  () => projectStore.currentChat?.id,
+  () => {
     scrollToBottom()
   }
 )
 
-// 监听"+ New Chat"请求（点击侧边栏New Chat时触发）
+// 监听消息数量变化 → 滚动到底部
+watch(
+  () => projectStore.messages.length,
+  () => {
+    scrollToBottom()
+  }
+)
+
+// 监听"+ New Chat"请求
 watch(
   () => projectStore.newChatRequested,
   async () => {
     await handleNewChat()
   }
 )
-
-onMounted(async () => {
-  // 页面刷新后恢复：加载项目聊天列表
-  if (projectStore.currentProjectId && projectStore.chats.length === 0) {
-    await projectStore.loadChats()
-    if (projectStore.chats.length > 0 && !projectStore.currentChat) {
-      await projectStore.selectChat(projectStore.chats[0])
-    }
-  }
-})
 
 // 发送消息
 const handleSend = async () => {
@@ -84,7 +87,6 @@ const handleSend = async () => {
   try {
     await projectStore.sendMessageToChat(projectStore.currentChat.id, content)
     await projectStore.loadMessages(projectStore.currentChat.id)
-    messages.value = projectStore.messages
     scrollToBottom()
   } catch (error) {
     console.error('发送消息失败', error)
@@ -100,7 +102,6 @@ const handleNewChat = async () => {
     return
   }
   await projectStore.createNewChat()
-  messages.value = projectStore.messages
   scrollToBottom()
 }
 
@@ -119,15 +120,15 @@ const scrollToBottom = () => {
     <!-- 中间聊天窗口 -->
     <template #default>
       <div class="chat-container">
-        <!-- 消息列表 -->
+        <!-- 消息列表：直接使用store状态 -->
         <div class="messages" ref="messagesContainer">
-          <div v-if="messages.length === 0" class="empty-state">
+          <div v-if="projectStore.messages.length === 0" class="empty-state">
             <h2>CareerPilot AI</h2>
             <p>有什么我可以帮助你的？</p>
             <p class="hint">支持：普通聊天 / RAG知识检索 / 多Agent协作</p>
           </div>
 
-          <div v-for="msg in messages" :key="msg.id" class="message" :class="msg.role">
+          <div v-for="msg in projectStore.messages" :key="msg.id" class="message" :class="msg.role">
             <div class="message-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
             <div class="message-content">{{ msg.content }}</div>
           </div>
@@ -162,6 +163,10 @@ const scrollToBottom = () => {
         <div class="context-section">
           <h4>当前项目</h4>
           <p>{{ projectStore.currentProject?.name || '未选择' }}</p>
+        </div>
+        <div class="context-section">
+          <h4>当前聊天</h4>
+          <p>{{ projectStore.currentChat?.title || '未选择' }}</p>
         </div>
         <div class="context-section">
           <h4>最近更新</h4>
