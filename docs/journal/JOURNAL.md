@@ -593,3 +593,43 @@ volumes:
 
 - Step 1.7: 创建前端项目
 - 验证后端是否能启动
+
+---
+
+## Phase A: AI能力接入（2026-08-02）
+
+### T1: LLM服务层 ✅
+- 创建 `services/llm_service.py`：OpenAI/Ollama双引擎
+- 通过 ChatOpenAI 统一封装（Ollama走/v1兼容接口）
+- 修复 .env 路径（env_file=../.env）
+
+### T2: 聊天接入LLM + SSE流式 ✅
+- 非流式：chat_completion()
+- 流式：SSE逐字输出（/stream接口）
+- 前端 streamMessage() 解析SSE
+
+### T3: 知识库RAG ✅
+- 创建 `services/rag_service.py`
+- 解析：TXT/MD/PDF/DOCX
+- 分块：RecursiveCharacterTextSplitter(500/50)
+- 嵌入：Ollama nomic-embed-text（768维）
+- 存储：ChromaDB持久化（每项目一个集合）
+- 检索：Top-K语义检索
+- 项目聊天自动RAG增强
+- 修复：numpy降级1.26.4（chromadb兼容）
+
+### T4: LangGraph多智能体 ✅
+- 创建 `agents/langgraph_workflow.py`
+- Coordinator节点：LLM意图识别
+- 条件路由：knowledge/experience/interview/document/chat
+- 5个Agent节点各调用LLM
+- Knowledge Agent集成RAG
+- 聊天接口接入多智能体调度
+
+### 遇到问题
+| 问题 | 解决方案 |
+|------|----------|
+| OpenAI key为空 | .env路径改为../.env |
+| Ollama 404 | base_url加/v1路径 |
+| numpy 2.x与chromadb冲突 | 降级numpy<2 |
+| chroma_data被提交 | 加入.gitignore |
