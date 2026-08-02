@@ -45,8 +45,8 @@ const createProject = async () => {
 }
 
 // 导航
-const navigateTo = (path: string) => {
-  router.push(path)
+const navigateTo = (target: any) => {
+  router.push(target)
 }
 
 // 选择项目（跳转到聊天）
@@ -75,14 +75,14 @@ const logout = () => {
       <!-- 导航内容 -->
       <div class="sidebar-content">
         <!-- + New Chat -->
-        <button class="new-chat-btn" @click="navigateTo('/')">
+        <button class="new-chat-btn" @click="navigateTo({ path: '/', query: { action: 'new' } })">
           + New Chat
         </button>
 
         <!-- Recent Chats -->
         <div class="section">
           <div class="section-title">Recent Chats</div>
-          <div class="nav-item" @click="navigateTo('/')">💬 最近聊天</div>
+          <div class="nav-item" @click="navigateTo({ path: '/', query: { action: 'recent' } })">💬 最近聊天</div>
         </div>
 
         <!-- Projects -->

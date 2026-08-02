@@ -22,19 +22,50 @@ onMounted(async () => {
   await loadChats()
 })
 
-// 监听路由参数变化（点击侧边栏项目时触发）
+// 监听路由参数变化（点击侧边栏项目/新聊天/最近聊天时触发）
 watch(
-  () => route.query.project,
-  (newVal) => {
-    if (newVal) {
-      projectId.value = newVal as string
+  () => route.query,
+  (newQuery) => {
+    // 点击项目
+    if (newQuery.project) {
+      projectId.value = newQuery.project as string
       localStorage.setItem('current_project_id', projectId.value)
       currentChat.value = null
       messages.value = []
       loadChats()
     }
+
+    // 点击"+ New Chat"
+    if (newQuery.action === 'new') {
+      currentChat.value = null
+      messages.value = []
+      if (projectId.value) {
+        handleNewChat()
+      }
+    }
+
+    // 点击"最近聊天"
+    if (newQuery.action === 'recent') {
+      loadChats()
+    }
   }
 )
+
+// 新建聊天
+const handleNewChat = async () => {
+  if (!projectId.value) {
+    alert('请先在左侧选择一个项目')
+    return
+  }
+  try {
+    const response = await createChat(projectId.value, { title: '新聊天' })
+    currentChat.value = response.data
+    messages.value = []
+    await loadChats()
+  } catch (error) {
+    console.error('创建聊天失败', error)
+  }
+}
 
 // 加载聊天列表
 const loadChats = async () => {
