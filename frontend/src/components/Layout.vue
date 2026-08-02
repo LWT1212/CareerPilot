@@ -5,10 +5,12 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useProjectStore } from '../stores/project'
 import api from '../api'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const projectStore = useProjectStore()
 
 const rightPanelCollapsed = ref(false)
 const projects = ref<any[]>([])
@@ -18,6 +20,10 @@ const newProjectDesc = ref('')
 
 onMounted(async () => {
   await loadProjects()
+  // 刷新页面时恢复当前项目上下文
+  if (projectStore.currentProjectId) {
+    await projectStore.loadProjectDetail()
+  }
 })
 
 // 加载项目列表
@@ -49,14 +55,21 @@ const navigateTo = (target: any) => {
   router.push(target)
 }
 
-// 选择项目（跳转到聊天）
-const selectProject = (id: string) => {
-  localStorage.setItem('current_project_id', id)
-  router.push({ path: '/', query: { project: id } })
+// 选择项目（切换到项目上下文并进入聊天）
+const selectProject = async (id: string) => {
+  await projectStore.setProject(id)
+  router.push('/')
+}
+
+// 点击"+ New Chat"（触发新聊天）
+const handleNewChat = () => {
+  projectStore.requestNewChat()
+  router.push('/')
 }
 
 // 退出登录
 const logout = () => {
+  projectStore.clear()
   authStore.logout()
   router.push('/login')
 }
@@ -75,14 +88,14 @@ const logout = () => {
       <!-- 导航内容 -->
       <div class="sidebar-content">
         <!-- + New Chat -->
-        <button class="new-chat-btn" @click="navigateTo({ path: '/', query: { action: 'new' } })">
+        <button class="new-chat-btn" @click="handleNewChat">
           + New Chat
         </button>
 
         <!-- Recent Chats -->
         <div class="section">
           <div class="section-title">Recent Chats</div>
-          <div class="nav-item" @click="navigateTo({ path: '/', query: { action: 'recent' } })">💬 最近聊天</div>
+          <div class="nav-item" @click="navigateTo('/')">💬 最近聊天</div>
         </div>
 
         <!-- Projects -->

@@ -1,13 +1,13 @@
-<!-- 聊天页面 - 按照PRD设计 -->
-<!-- 中间聊天窗口：支持普通聊天、RAG、多Agent -->
+<!-- 聊天页面 - 使用全局项目状态 -->
+<!-- 支持：普通聊天 / RAG知识检索 / 多Agent协作 -->
 
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
 import Layout from '../components/Layout.vue'
+import { useProjectStore } from '../stores/project'
 import { getMessages, sendMessage, createChat, getChats } from '../api/chat'
 
-const route = useRoute()
+const projectStore = useProjectStore()
 
 const chats = ref<any[]>([])
 const currentChat = ref<any>(null)
@@ -16,61 +16,39 @@ const inputMessage = ref('')
 const loading = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
-const projectId = ref<string>(localStorage.getItem('current_project_id') || '')
+const projectId = ref(projectStore.currentProjectId)
+
+// 监听项目切换（点击侧边栏项目时触发）
+watch(
+  () => projectStore.currentProjectId,
+  (newId) => {
+    projectId.value = newId
+    currentChat.value = null
+    messages.value = []
+    chats.value = []
+    loadChats()
+  }
+)
+
+// 监听"+ New Chat"请求（点击侧边栏New Chat时触发）
+watch(
+  () => projectStore.newChatRequested,
+  () => {
+    handleNewChat()
+  }
+)
 
 onMounted(async () => {
   await loadChats()
 })
 
-// 监听路由参数变化（点击侧边栏项目/新聊天/最近聊天时触发）
-watch(
-  () => route.query,
-  (newQuery) => {
-    // 点击项目
-    if (newQuery.project) {
-      projectId.value = newQuery.project as string
-      localStorage.setItem('current_project_id', projectId.value)
-      currentChat.value = null
-      messages.value = []
-      loadChats()
-    }
-
-    // 点击"+ New Chat"
-    if (newQuery.action === 'new') {
-      currentChat.value = null
-      messages.value = []
-      if (projectId.value) {
-        handleNewChat()
-      }
-    }
-
-    // 点击"最近聊天"
-    if (newQuery.action === 'recent') {
-      loadChats()
-    }
-  }
-)
-
-// 新建聊天
-const handleNewChat = async () => {
-  if (!projectId.value) {
-    alert('请先在左侧选择一个项目')
-    return
-  }
-  try {
-    const response = await createChat(projectId.value, { title: '新聊天' })
-    currentChat.value = response.data
-    messages.value = []
-    await loadChats()
-  } catch (error) {
-    console.error('创建聊天失败', error)
-  }
-}
-
 // 加载聊天列表
 const loadChats = async () => {
   try {
-    if (!projectId.value) return
+    if (!projectId.value) {
+      chats.value = []
+      return
+    }
     const response = await getChats(projectId.value)
     chats.value = response.data.items || response.data || []
     if (chats.value.length > 0 && !currentChat.value) {
@@ -139,6 +117,22 @@ const handleSend = async () => {
   }
 }
 
+// 新建聊天
+const handleNewChat = async () => {
+  if (!projectId.value) {
+    alert('请先在左侧选择一个项目')
+    return
+  }
+  try {
+    const response = await createChat(projectId.value, { title: '新聊天' })
+    currentChat.value = response.data
+    messages.value = []
+    await loadChats()
+  } catch (error) {
+    console.error('创建聊天失败', error)
+  }
+}
+
 // 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
@@ -196,7 +190,7 @@ const scrollToBottom = () => {
       <div class="context-content">
         <div class="context-section">
           <h4>当前项目</h4>
-          <p>{{ projectId || '未选择' }}</p>
+          <p>{{ projectStore.currentProject?.name || '未选择' }}</p>
         </div>
         <div class="context-section">
           <h4>最近更新</h4>
@@ -216,7 +210,7 @@ const scrollToBottom = () => {
         </div>
         <div class="context-section">
           <h4>知识库</h4>
-          <p class="text-muted">0 个文档</p>
+          <p class="text-muted">上传文档后显示</p>
         </div>
         <div class="context-section">
           <h4>最近面试</h4>

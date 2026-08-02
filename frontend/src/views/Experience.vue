@@ -3,10 +3,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
+import { useProjectStore } from '../stores/project'
 import { getExperiences, createExperience, deleteExperience } from '../api/experience'
 import { ElMessage } from 'element-plus'
 
-const projectId = ref(localStorage.getItem('current_project_id') || '')
+const projectStore = useProjectStore()
+const projectId = ref(projectStore.currentProjectId)
 
 const experiences = ref<any[]>([])
 const loading = ref(false)

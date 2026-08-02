@@ -3,10 +3,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import Layout from '../components/Layout.vue'
+import { useProjectStore } from '../stores/project'
 import { getDocuments, uploadDocument, deleteDocument, searchKnowledge } from '../api/knowledge'
 import { ElMessage } from 'element-plus'
 
-const projectId = ref(localStorage.getItem('current_project_id') || '')
+const projectStore = useProjectStore()
+const projectId = ref(projectStore.currentProjectId)
 
 const documents = ref<any[]>([])
 const loading = ref(false)
