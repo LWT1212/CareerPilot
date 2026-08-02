@@ -1,7 +1,7 @@
 <!-- 经验管理页面 - ChatGPT风格 -->
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
 import { getExperiences, createExperience, deleteExperience } from '../api/experience'
@@ -25,6 +25,15 @@ const types = [
 onMounted(async () => {
   await loadExperiences()
 })
+
+// 监听项目切换，自动刷新数据
+watch(
+  () => projectStore.currentProjectId,
+  () => {
+    projectId.value = projectStore.currentProjectId
+    loadExperiences()
+  }
+)
 
 const loadExperiences = async () => {
   loading.value = true

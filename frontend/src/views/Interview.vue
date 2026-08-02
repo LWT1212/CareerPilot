@@ -1,7 +1,7 @@
 <!-- 面试模块页面 - ChatGPT风格 -->
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
 import { getInterviews, createInterview, deleteInterview, getInterviewStats } from '../api/interview'
@@ -20,6 +20,16 @@ onMounted(async () => {
   await loadInterviews()
   await loadStats()
 })
+
+// 监听项目切换，自动刷新数据
+watch(
+  () => projectStore.currentProjectId,
+  () => {
+    projectId.value = projectStore.currentProjectId
+    loadInterviews()
+    loadStats()
+  }
+)
 
 const loadInterviews = async () => {
   loading.value = true

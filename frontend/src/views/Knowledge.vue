@@ -1,7 +1,7 @@
 <!-- 知识库页面 - ChatGPT风格 -->
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
 import { getDocuments, uploadDocument, deleteDocument, searchKnowledge } from '../api/knowledge'
@@ -18,6 +18,15 @@ const searchResults = ref<any[]>([])
 onMounted(async () => {
   await loadDocuments()
 })
+
+// 监听项目切换，自动刷新数据
+watch(
+  () => projectStore.currentProjectId,
+  () => {
+    projectId.value = projectStore.currentProjectId
+    loadDocuments()
+  }
+)
 
 const loadDocuments = async () => {
   loading.value = true
