@@ -14,7 +14,7 @@ class ChatCreate(BaseModel):
 # 聊天响应
 class ChatResponse(BaseModel):
     id: str
-    project_id: str
+    project_id: Optional[str]  # 全局聊天为 None
     title: Optional[str]
     model: Optional[str]
     created_at: datetime
