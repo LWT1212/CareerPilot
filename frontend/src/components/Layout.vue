@@ -1,5 +1,5 @@
-<!-- 主布局 - 按照PRD页面设计 -->
-<!-- 左侧：导航栏（项目可展开显示聊天和文档）| 中间：内容区 | 右侧：Project Context -->
+<!-- 主布局 - 支持全局聊天 + 项目内聊天/文档 -->
+<!-- 外部聊天（Recent Chats）| 项目展开（项目聊天+文档） -->
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
@@ -25,8 +25,10 @@ const projectDetails = ref<Record<string, { chats: any[]; docs: any[] }>>({})
 
 onMounted(async () => {
   await loadProjects()
+  await projectStore.loadGlobalChats()
   if (projectStore.currentProjectId) {
     await projectStore.loadProjectDetail()
+    expandedProjectId.value = projectStore.currentProjectId
   }
 })
 
@@ -35,11 +37,6 @@ const loadProjects = async () => {
   try {
     const response = await api.get('/projects')
     projects.value = response.data.items || []
-    // 恢复上次展开的项目
-    if (projectStore.currentProjectId) {
-      expandedProjectId.value = projectStore.currentProjectId
-      await toggleProject(projects.value.find(p => p.id === projectStore.currentProjectId), false)
-    }
   } catch (error) {
     console.error('加载项目失败', error)
   }
@@ -65,20 +62,15 @@ const navigateTo = (target: any) => {
 }
 
 // 展开/折叠项目
-const toggleProject = async (project: any, forceLoad: boolean = true) => {
+const toggleProject = async (project: any) => {
   if (!project) return
-
-  // 如果点击的是其他项目，先切换项目上下文
-  if (project.id !== projectStore.currentProjectId) {
-    await projectStore.setProject(project.id)
-  }
 
   // 展开/折叠切换
   if (expandedProjectId.value === project.id) {
     expandedProjectId.value = ''
   } else {
     expandedProjectId.value = project.id
-    if (!projectDetails.value[project.id] || forceLoad) {
+    if (!projectDetails.value[project.id]) {
       await loadProjectDetails(project.id)
     }
   }
@@ -92,7 +84,7 @@ const loadProjectDetails = async (projectId: string) => {
       api.get(`/projects/${projectId}/knowledge`),
     ])
     projectDetails.value[projectId] = {
-      chats: chatsRes.data.items || chatsRes.data || [],
+      chats: chatsRes.data || [],
       docs: docsRes.data || [],
     }
   } catch (error) {
@@ -100,8 +92,16 @@ const loadProjectDetails = async (projectId: string) => {
   }
 }
 
+// 点击全局聊天
+const selectGlobalChat = async (chat: any) => {
+  // 切换到全局模式
+  await projectStore.setProject('')
+  await projectStore.selectChat(chat)
+  router.push('/')
+}
+
 // 点击项目下的聊天
-const selectChat = async (chat: any) => {
+const selectProjectChat = async (chat: any) => {
   if (projectStore.currentProjectId !== chat.project_id) {
     await projectStore.setProject(chat.project_id)
   }
@@ -109,13 +109,21 @@ const selectChat = async (chat: any) => {
   router.push('/')
 }
 
-// 点击"+ New Chat"（触发新聊天）
-const handleNewChat = () => {
+// 点击"+ New Chat"：创建全局聊天（外部聊天）
+const handleNewGlobalChat = () => {
+  projectStore.setProject('')
   projectStore.requestNewChat()
   router.push('/')
 }
 
-// 点击项目下的文档 → 进入知识库
+// 在展开的项目下新建聊天
+const handleNewProjectChat = async (projectId: string) => {
+  await projectStore.setProject(projectId)
+  projectStore.requestNewChat()
+  router.push('/')
+}
+
+// 项目下的文档 → 进入知识库
 const goToKnowledge = () => {
   navigateTo('/knowledge')
 }
@@ -140,19 +148,33 @@ const logout = () => {
 
       <!-- 导航内容 -->
       <div class="sidebar-content">
-        <!-- + New Chat -->
-        <button class="new-chat-btn" @click="handleNewChat">
+        <!-- + New Chat（全局聊天） -->
+        <button class="new-chat-btn" @click="handleNewGlobalChat">
           + New Chat
         </button>
 
-        <!-- Projects（可展开） -->
+        <!-- Recent Chats（全局聊天列表） -->
+        <div class="section">
+          <div class="section-title">Recent Chats</div>
+          <div
+            v-for="chat in projectStore.globalChats"
+            :key="chat.id"
+            class="nav-item chat-item"
+            :class="{ active: projectStore.currentChat?.id === chat.id && !projectStore.currentProjectId }"
+            @click="selectGlobalChat(chat)"
+          >
+            💬 {{ chat.title || '新聊天' }}
+          </div>
+          <div v-if="projectStore.globalChats.length === 0" class="empty-text">暂无全局聊天</div>
+        </div>
+
+        <!-- Projects（可展开：项目聊天+文档） -->
         <div class="section">
           <div class="section-header">
             <span class="section-title">Projects</span>
             <button class="add-btn" @click="showNewProjectDialog = true" title="新建项目">+</button>
           </div>
 
-          <!-- 项目列表 -->
           <div
             v-for="project in projects"
             :key="project.id"
@@ -169,16 +191,19 @@ const logout = () => {
               <span class="project-name">{{ project.name }}</span>
             </div>
 
-            <!-- 展开的内容：聊天 + 文档 -->
+            <!-- 展开内容 -->
             <div v-if="expandedProjectId === project.id" class="project-details">
+              <!-- 新建项目聊天 -->
+              <div class="new-chat-small" @click="handleNewProjectChat(project.id)">+ 新建聊天</div>
+
               <!-- 该项目的聊天 -->
               <div class="detail-label">💬 聊天</div>
               <div
                 v-for="chat in projectDetails[project.id]?.chats || []"
                 :key="chat.id"
                 class="detail-item"
-                :class="{ active: projectStore.currentChat?.id === chat.id }"
-                @click="selectChat(chat)"
+                :class="{ active: projectStore.currentChat?.id === chat.id && projectStore.currentProjectId === project.id }"
+                @click="selectProjectChat(chat)"
               >
                 {{ chat.title || '新聊天' }}
               </div>
@@ -200,7 +225,7 @@ const logout = () => {
               <div
                 v-if="(projectDetails[project.id]?.docs || []).length === 0"
                 class="detail-empty"
-              >暂无文档，点击上方知识库上传</div>
+              >暂无文档，点上方知识库上传</div>
             </div>
           </div>
 
@@ -381,6 +406,10 @@ const logout = () => {
   background: #f0f0f0;
 }
 
+.nav-item.active {
+  background: #e8e8e8;
+}
+
 /* 项目树 */
 .project-tree {
   margin-bottom: 4px;
@@ -426,6 +455,18 @@ const logout = () => {
 .project-details {
   padding-left: 24px;
   margin-bottom: 8px;
+}
+
+.new-chat-small {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #667eea;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.new-chat-small:hover {
+  background: #f5f7ff;
 }
 
 .detail-label {

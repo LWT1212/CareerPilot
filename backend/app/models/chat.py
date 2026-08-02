@@ -12,7 +12,8 @@ class Chat(Base):
     __tablename__ = "chats"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    # project_id 为空 = 全局聊天（不隶属于任何项目）
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True)
     title = Column(String(200), nullable=True)
     model = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

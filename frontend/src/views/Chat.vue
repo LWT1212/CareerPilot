@@ -11,16 +11,24 @@ const inputMessage = ref('')
 const loading = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
-// 页面挂载时恢复当前项目状态
+// 页面挂载时恢复当前状态（支持全局模式和项目模式）
 onMounted(async () => {
-  if (!projectStore.currentProjectId) return
-  // 如果没有聊天列表，加载
-  if (projectStore.chats.length === 0) {
-    await projectStore.loadChats()
-  }
-  // 如果没有选中聊天且有聊天，自动选中第一个
-  if (!projectStore.currentChat && projectStore.chats.length > 0) {
-    await projectStore.selectChat(projectStore.chats[0])
+  if (projectStore.currentProjectId) {
+    // 项目模式：加载项目聊天
+    if (projectStore.chats.length === 0) {
+      await projectStore.loadChats()
+    }
+    if (!projectStore.currentChat && projectStore.chats.length > 0) {
+      await projectStore.selectChat(projectStore.chats[0])
+    }
+  } else {
+    // 全局模式：加载全局聊天
+    if (projectStore.globalChats.length === 0) {
+      await projectStore.loadGlobalChats()
+    }
+    if (!projectStore.currentChat && projectStore.globalChats.length > 0) {
+      await projectStore.selectChat(projectStore.globalChats[0])
+    }
   }
   scrollToBottom()
 })
@@ -61,12 +69,7 @@ watch(
 const handleSend = async () => {
   if (!inputMessage.value.trim()) return
 
-  if (!projectStore.currentProjectId) {
-    alert('请先在左侧选择一个项目')
-    return
-  }
-
-  // 如果没有当前聊天，先创建
+  // 如果没有当前聊天，先创建（自动判断全局/项目模式）
   if (!projectStore.currentChat) {
     const chat = await projectStore.createNewChat()
     if (!chat) return
@@ -95,12 +98,8 @@ const handleSend = async () => {
   }
 }
 
-// 新建聊天
+// 新建聊天（全局或项目模式）
 const handleNewChat = async () => {
-  if (!projectStore.currentProjectId) {
-    alert('请先在左侧选择一个项目')
-    return
-  }
   await projectStore.createNewChat()
   scrollToBottom()
 }
