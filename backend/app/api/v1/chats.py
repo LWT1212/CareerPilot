@@ -18,6 +18,30 @@ from app.services.chat_service import (
     messages_to_llm_history
 )
 from app.services.llm_service import chat_completion, stream_completion
+from app.services.rag_service import build_rag_context
+
+
+def _build_system_prompt(db: Session, chat_id: str, user_message: str) -> str:
+    """
+    构建系统提示词
+    如果聊天属于某个项目，检索该项目知识库作为RAG上下文
+    """
+    # 获取聊天的项目
+    chat = get_chat(db, chat_id)
+    if not chat or not chat.project_id:
+        return ""  # 全局聊天无RAG
+
+    # 检索项目知识库
+    context = build_rag_context(chat.project_id, user_message, top_k=3)
+    if not context:
+        return ""
+
+    return (
+        "你是CareerPilot AI助手，请基于以下项目知识库内容回答用户问题。\n"
+        "如果知识库中没有相关信息，请如实说明。\n\n"
+        "【项目知识库】\n"
+        f"{context}"
+    )
 
 # 全局聊天路由
 router = APIRouter(prefix="/chats", tags=["全局聊天"])
@@ -94,9 +118,12 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
     # 2. 获取历史消息（供LLM理解上下文）
     history = messages_to_llm_history(db, chat_id)
 
-    # 3. 调用真实LLM生成回复
+    # 3. 构建RAG上下文（项目聊天自动检索知识库）
+    system_prompt = _build_system_prompt(db, chat_id, message_data.content)
+
+    # 4. 调用真实LLM生成回复
     try:
-        ai_content = await chat_completion(history, message_data.content)
+        ai_content = await chat_completion(history, message_data.content, system_prompt)
         agent_used = "llm"
     except Exception as e:
         # LLM调用失败时返回友好提示
@@ -104,7 +131,7 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
         ai_content = "（AI服务暂时不可用，请检查LLM配置：OPENAI_API_KEY 或 Ollama服务）"
         agent_used = "error"
 
-    # 4. 保存AI回复
+    # 5. 保存AI回复
     ai_message = ai_reply(db, chat_id, ai_content, agent_used)
 
     return ai_message
@@ -133,11 +160,14 @@ async def stream_send(chat_id: str, message_data: MessageCreate, db: Session = D
     # 2. 获取历史消息
     history = messages_to_llm_history(db, chat_id)
 
+    # 3. 构建RAG上下文（项目聊天自动检索知识库）
+    system_prompt = _build_system_prompt(db, chat_id, message_data.content)
+
     async def event_generator():
         full_content = ""
         try:
             # 流式获取LLM回复
-            async for chunk in stream_completion(history, message_data.content):
+            async for chunk in stream_completion(history, message_data.content, system_prompt):
                 full_content += chunk
                 # SSE格式：data: {...}\n\n
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"

@@ -1,11 +1,17 @@
-# 知识库服务 - 处理文档上传、解析、检索
+# 知识库服务 - 处理文档上传、索引（RAG）、检索
 
 import os
 import uuid
 from sqlalchemy.orm import Session
 from app.models.knowledge import KnowledgeDocument
-from app.schemas.knowledge import KnowledgeSearchRequest, KnowledgeSearchResult
+from app.schemas.knowledge import KnowledgeSearchResult
 from app.config import settings
+from app.services.rag_service import (
+    index_document,
+    delete_document_vectors,
+    search_documents,
+    parse_document,
+)
 
 
 # 上传文档
@@ -27,15 +33,26 @@ def upload_document(db: Session, project_id: str, filename: str, file_content: b
         file_type=file_type,
         file_path=file_path,
         file_size=len(file_content),
-        embedding_status="pending"
+        embedding_status="processing"
     )
     db.add(new_doc)
     db.commit()
     db.refresh(new_doc)
 
-    # TODO: 异步处理文档解析和向量嵌入
-    # process_document.delay(new_doc.id)
+    # 索引文档：解析 → 分块 → 嵌入 → 存入ChromaDB
+    try:
+        chunk_count = index_document(project_id, new_doc.id, file_path, file_type)
+        new_doc.embedding_status = "completed"
+        new_doc.embedding_count = chunk_count
+        # 保存解析后的纯文本
+        new_doc.content = parse_document(file_path, file_type)[:5000]
+        db.commit()
+    except Exception as e:
+        print(f"文档索引失败: {e}")
+        new_doc.embedding_status = "failed"
+        db.commit()
 
+    db.refresh(new_doc)
     return new_doc
 
 
@@ -58,7 +75,7 @@ def get_document(db: Session, doc_id: str, project_id: str):
     ).first()
 
 
-# 删除文档
+# 删除文档（同时删除向量）
 def delete_document(db: Session, doc_id: str, project_id: str):
     doc = db.query(KnowledgeDocument).filter(
         KnowledgeDocument.id == doc_id,
@@ -71,29 +88,29 @@ def delete_document(db: Session, doc_id: str, project_id: str):
     if os.path.exists(doc.file_path):
         os.remove(doc.file_path)
 
+    # 删除ChromaDB中的向量
+    delete_document_vectors(project_id, doc_id)
+
     db.delete(doc)
     db.commit()
     return True
 
 
-# 知识检索（简单实现，后续可以接入ChromaDB）
+# 知识检索（语义检索，基于ChromaDB）
 def search_knowledge(db: Session, project_id: str, query: str, top_k: int = 5):
-    # 获取该项目所有已完成嵌入的文档
-    docs = db.query(KnowledgeDocument).filter(
-        KnowledgeDocument.project_id == project_id,
-        KnowledgeDocument.embedding_status == "completed"
-    ).all()
+    results = search_documents(project_id, query, top_k)
 
-    results = []
-    for doc in docs:
-        # 简单的关键词匹配（后续替换为向量检索）
-        if doc.content and query.lower() in doc.content.lower():
-            results.append(KnowledgeSearchResult(
-                document_id=doc.id,
-                filename=doc.filename,
-                content=doc.content[:500],  # 截取前500字符
-                score=0.8,  # 模拟相似度
-                metadata={"file_type": doc.file_type}
-            ))
-
-    return results[:top_k]
+    # 补充文档文件名信息
+    output = []
+    for r in results:
+        doc = db.query(KnowledgeDocument).filter(
+            KnowledgeDocument.id == r["doc_id"]
+        ).first()
+        output.append(KnowledgeSearchResult(
+            document_id=r["doc_id"],
+            filename=doc.filename if doc else "未知",
+            content=r["content"],
+            score=r["score"],
+            metadata={"file_type": doc.file_type if doc else ""}
+        ))
+    return output
