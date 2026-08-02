@@ -46,3 +46,7 @@ docker-compose.override.yml
 # Logs
 *.log
 logs/
+
+# Vector Database
+chroma_data/
+chroma/backend/ 2>/dev/null
