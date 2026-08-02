@@ -109,7 +109,7 @@ message_router = APIRouter(prefix="/chats/{chat_id}/messages", tags=["消息"])
 @message_router.post("", response_model=MessageResponse)
 async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(get_db)):
     """
-    发送消息并获取AI回复
+    发送消息并获取AI回复（多智能体调度）
     - content: 消息内容
     """
     # 1. 保存用户消息
@@ -118,16 +118,21 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
     # 2. 获取历史消息（供LLM理解上下文）
     history = messages_to_llm_history(db, chat_id)
 
-    # 3. 构建RAG上下文（项目聊天自动检索知识库）
-    system_prompt = _build_system_prompt(db, chat_id, message_data.content)
+    # 3. 获取聊天所属项目（用于RAG）
+    chat = get_chat(db, chat_id)
+    project_id = chat.project_id if chat else None
 
-    # 4. 调用真实LLM生成回复
+    # 4. 调用LangGraph多智能体工作流
     try:
-        ai_content = await chat_completion(history, message_data.content, system_prompt)
-        agent_used = "llm"
+        from app.agents.langgraph_workflow import run_agent
+        result = await run_agent(message_data.content, project_id or "", history)
+        ai_content = result.get("response", "")
+        agent_used = result.get("intent", "llm")
+        if not ai_content:
+            ai_content = "（未能生成回复）"
     except Exception as e:
         # LLM调用失败时返回友好提示
-        print(f"LLM调用失败: {e}")
+        print(f"多智能体调用失败: {e}")
         ai_content = "（AI服务暂时不可用，请检查LLM配置：OPENAI_API_KEY 或 Ollama服务）"
         agent_used = "error"
 
