@@ -4,6 +4,7 @@
 import { onMounted, watch, nextTick, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
+import { streamMessage } from '../api/chat'
 
 const projectStore = useProjectStore()
 
@@ -65,7 +66,7 @@ watch(
   }
 )
 
-// 发送消息
+// 发送消息（使用SSE流式）
 const handleSend = async () => {
   if (!inputMessage.value.trim()) return
 
@@ -85,16 +86,35 @@ const handleSend = async () => {
     role: 'user',
     content: content
   })
+
+  // 添加一个空的AI消息，流式填充
+  const aiMsgId = Date.now() + 1
+  projectStore.messages.push({
+    id: aiMsgId,
+    role: 'assistant',
+    content: ''
+  })
   scrollToBottom()
 
   try {
-    await projectStore.sendMessageToChat(projectStore.currentChat.id, content)
-    await projectStore.loadMessages(projectStore.currentChat.id)
-    scrollToBottom()
+    // 流式接收AI回复
+    let fullContent = ''
+    await streamMessage(projectStore.currentChat.id, content, (chunk) => {
+      fullContent += chunk
+      // 更新AI消息内容（实时显示）
+      const msg = projectStore.messages.find(m => m.id === aiMsgId)
+      if (msg) msg.content = fullContent
+      scrollToBottom()
+    })
   } catch (error) {
     console.error('发送消息失败', error)
+    const msg = projectStore.messages.find(m => m.id === aiMsgId)
+    if (msg) msg.content = '（消息发送失败，请重试）'
   } finally {
     loading.value = false
+    // 刷新消息列表（从数据库拉取最新）
+    await projectStore.loadMessages(projectStore.currentChat.id)
+    scrollToBottom()
   }
 }
 
