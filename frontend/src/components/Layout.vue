@@ -2,7 +2,7 @@
 <!-- 外部聊天（Recent Chats）| 项目展开（项目聊天+文档） -->
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useProjectStore } from '../stores/project'
@@ -70,6 +70,8 @@ const toggleProject = async (project: any) => {
     expandedProjectId.value = ''
   } else {
     expandedProjectId.value = project.id
+    // 展开时同步设置当前项目上下文（知识库/聊天都关联此项目）
+    await projectStore.setProject(project.id)
     if (!projectDetails.value[project.id]) {
       await loadProjectDetails(project.id)
     }
@@ -123,10 +125,23 @@ const handleNewProjectChat = async (projectId: string) => {
   router.push('/')
 }
 
-// 项目下的文档 → 进入知识库
-const goToKnowledge = () => {
+// 项目下的文档 → 进入知识库（并设置当前项目）
+const goToKnowledge = async (projectId?: string) => {
+  if (projectId) {
+    await projectStore.setProject(projectId)
+  }
   navigateTo('/knowledge')
 }
+
+// 监听聊天列表变化，同步侧边栏
+watch(
+  () => projectStore.chats,
+  () => {
+    if (expandedProjectId.value) {
+      loadProjectDetails(expandedProjectId.value)
+    }
+  }
+)
 
 // 退出登录
 const logout = () => {
@@ -193,8 +208,11 @@ const logout = () => {
 
             <!-- 展开内容 -->
             <div v-if="expandedProjectId === project.id" class="project-details">
-              <!-- 新建项目聊天 -->
-              <div class="new-chat-small" @click="handleNewProjectChat(project.id)">+ 新建聊天</div>
+              <!-- 项目操作 -->
+              <div class="project-actions">
+                <div class="new-chat-small" @click="handleNewProjectChat(project.id)">💬 新建聊天</div>
+                <div class="new-chat-small" @click="goToKnowledge(project.id)">📤 上传文档</div>
+              </div>
 
               <!-- 该项目的聊天 -->
               <div class="detail-label">💬 聊天</div>
@@ -218,14 +236,14 @@ const logout = () => {
                 v-for="doc in projectDetails[project.id]?.docs || []"
                 :key="doc.id"
                 class="detail-item"
-                @click="goToKnowledge"
+                @click="goToKnowledge(project.id)"
               >
                 {{ doc.filename }}
               </div>
               <div
                 v-if="(projectDetails[project.id]?.docs || []).length === 0"
                 class="detail-empty"
-              >暂无文档，点上方知识库上传</div>
+              >暂无文档，点上方"上传文档"</div>
             </div>
           </div>
 
@@ -457,12 +475,21 @@ const logout = () => {
   margin-bottom: 8px;
 }
 
+.project-actions {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
 .new-chat-small {
+  flex: 1;
   padding: 8px 12px;
   font-size: 13px;
   color: #667eea;
   cursor: pointer;
   border-radius: 6px;
+  border: 1px dashed #d0d0d0;
+  text-align: center;
 }
 
 .new-chat-small:hover {
