@@ -6,6 +6,8 @@ import Layout from '../components/Layout.vue'
 import { getInterviews, createInterview, deleteInterview, getInterviewStats } from '../api/interview'
 import { ElMessage } from 'element-plus'
 
+const projectId = ref(localStorage.getItem('current_project_id') || '')
+
 const interviews = ref<any[]>([])
 const stats = ref<any>(null)
 const loading = ref(false)
@@ -20,7 +22,7 @@ onMounted(async () => {
 const loadInterviews = async () => {
   loading.value = true
   try {
-    const response = await getInterviews('current')
+    const response = await getInterviews(projectId.value)
     interviews.value = response.data
   } catch (error) {
     console.error('加载面试失败', error)
@@ -31,7 +33,7 @@ const loadInterviews = async () => {
 
 const loadStats = async () => {
   try {
-    const response = await getInterviewStats('current')
+    const response = await getInterviewStats(projectId.value)
     stats.value = response.data
   } catch (error) {
     console.error('加载统计失败', error)
@@ -40,7 +42,7 @@ const loadStats = async () => {
 
 const handleCreate = async () => {
   try {
-    await createInterview('current', newInterview.value)
+    await createInterview(projectId.value, newInterview.value)
     ElMessage.success('创建成功')
     showCreateDialog.value = false
     newInterview.value = { company: '', position: '', interview_date: '', result: '', overall_feedback: '' }
@@ -53,7 +55,7 @@ const handleCreate = async () => {
 
 const handleDelete = async (id: string) => {
   try {
-    await deleteInterview('current', id)
+    await deleteInterview(projectId.value, id)
     ElMessage.success('删除成功')
     await loadInterviews()
     await loadStats()

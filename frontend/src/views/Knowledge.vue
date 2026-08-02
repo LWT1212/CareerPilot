@@ -6,6 +6,8 @@ import Layout from '../components/Layout.vue'
 import { getDocuments, uploadDocument, deleteDocument, searchKnowledge } from '../api/knowledge'
 import { ElMessage } from 'element-plus'
 
+const projectId = ref(localStorage.getItem('current_project_id') || '')
+
 const documents = ref<any[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
@@ -18,7 +20,7 @@ onMounted(async () => {
 const loadDocuments = async () => {
   loading.value = true
   try {
-    const response = await getDocuments('current')
+    const response = await getDocuments(projectId.value)
     documents.value = response.data
   } catch (error) {
     console.error('加载文档失败', error)
@@ -29,7 +31,7 @@ const loadDocuments = async () => {
 
 const handleUpload = async (file: File) => {
   try {
-    await uploadDocument('current', file)
+    await uploadDocument(projectId.value, file)
     ElMessage.success('上传成功')
     await loadDocuments()
   } catch (error) {
@@ -39,7 +41,7 @@ const handleUpload = async (file: File) => {
 
 const handleDelete = async (docId: string) => {
   try {
-    await deleteDocument('current', docId)
+    await deleteDocument(projectId.value, docId)
     ElMessage.success('删除成功')
     await loadDocuments()
   } catch (error) {
@@ -50,7 +52,7 @@ const handleDelete = async (docId: string) => {
 const handleSearch = async () => {
   if (!searchQuery.value.trim()) return
   try {
-    const response = await searchKnowledge('current', searchQuery.value)
+    const response = await searchKnowledge(projectId.value, searchQuery.value)
     searchResults.value = response.data.results
   } catch (error) {
     console.error('检索失败', error)

@@ -1,4 +1,5 @@
-<!-- ChatGPT风格聊天页面 -->
+<!-- 聊天页面 - 按照PRD设计 -->
+<!-- 中间聊天窗口：支持普通聊天、RAG、多Agent -->
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
@@ -12,13 +13,17 @@ const inputMessage = ref('')
 const loading = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
+const projectId = ref<string>(localStorage.getItem('current_project_id') || '')
+
 onMounted(async () => {
   await loadChats()
 })
 
+// 加载聊天列表
 const loadChats = async () => {
   try {
-    const response = await getChats('current')
+    if (!projectId.value) return
+    const response = await getChats(projectId.value)
     chats.value = response.data.items || response.data || []
     if (chats.value.length > 0 && !currentChat.value) {
       await selectChat(chats.value[0])
@@ -28,11 +33,13 @@ const loadChats = async () => {
   }
 }
 
+// 选择聊天
 const selectChat = async (chat: any) => {
   currentChat.value = chat
   await loadMessages(chat.id)
 }
 
+// 加载消息
 const loadMessages = async (chatId: string) => {
   try {
     const response = await getMessages(chatId)
@@ -43,15 +50,22 @@ const loadMessages = async (chatId: string) => {
   }
 }
 
+// 发送消息
 const handleSend = async () => {
   if (!inputMessage.value.trim()) return
 
+  if (!projectId.value) {
+    alert('请先在左侧选择一个项目')
+    return
+  }
+
   if (!currentChat.value) {
     try {
-      const response = await createChat('current', { title: '新聊天' })
+      const response = await createChat(projectId.value, { title: '新聊天' })
       currentChat.value = response.data
       await loadChats()
     } catch (error) {
+      console.error('创建聊天失败', error)
       return
     }
   }
@@ -77,16 +91,7 @@ const handleSend = async () => {
   }
 }
 
-const handleNewChat = async () => {
-  try {
-    const response = await createChat('current', { title: '新聊天' })
-    await loadChats()
-    await selectChat(response.data)
-  } catch (error) {
-    console.error('创建聊天失败', error)
-  }
-}
-
+// 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -98,6 +103,7 @@ const scrollToBottom = () => {
 
 <template>
   <Layout>
+    <!-- 中间聊天窗口 -->
     <template #default>
       <div class="chat-container">
         <!-- 消息列表 -->
@@ -105,23 +111,18 @@ const scrollToBottom = () => {
           <div v-if="messages.length === 0" class="empty-state">
             <h2>CareerPilot AI</h2>
             <p>有什么我可以帮助你的？</p>
+            <p class="hint">支持：普通聊天 / RAG知识检索 / 多Agent协作</p>
           </div>
 
           <div v-for="msg in messages" :key="msg.id" class="message" :class="msg.role">
-            <div class="message-avatar">
-              {{ msg.role === 'user' ? '👤' : '🤖' }}
-            </div>
-            <div class="message-content">
-              {{ msg.content }}
-            </div>
+            <div class="message-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
+            <div class="message-content">{{ msg.content }}</div>
           </div>
 
           <div v-if="loading" class="message assistant">
             <div class="message-avatar">🤖</div>
             <div class="message-content loading">
-              <span class="dot"></span>
-              <span class="dot"></span>
-              <span class="dot"></span>
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
             </div>
           </div>
         </div>
@@ -136,34 +137,46 @@ const scrollToBottom = () => {
               :disabled="loading"
               rows="1"
             ></textarea>
-            <button class="send-btn" @click="handleSend" :disabled="loading || !inputMessage.trim()">
-              ➤
-            </button>
+            <button class="send-btn" @click="handleSend" :disabled="loading || !inputMessage.trim()">➤</button>
           </div>
         </div>
       </div>
     </template>
 
+    <!-- 右侧：Project Context -->
     <template #context>
       <div class="context-content">
         <div class="context-section">
           <h4>当前项目</h4>
-          <p>CareerPilot AI</p>
+          <p>{{ projectId || '未选择' }}</p>
         </div>
         <div class="context-section">
           <h4>最近更新</h4>
           <p class="text-muted">暂无更新</p>
         </div>
         <div class="context-section">
-          <h4>Agent状态</h4>
-          <div class="agent-status">
-            <span class="status-dot active"></span>
-            <span>Coordinator</span>
-          </div>
-          <div class="agent-status">
-            <span class="status-dot active"></span>
-            <span>Knowledge</span>
-          </div>
+          <h4>AI建议</h4>
+          <p class="text-muted">暂无建议</p>
+        </div>
+        <div class="context-section">
+          <h4>Agent执行</h4>
+          <div class="agent-status"><span class="status-dot active"></span> Coordinator</div>
+          <div class="agent-status"><span class="status-dot active"></span> Knowledge</div>
+          <div class="agent-status"><span class="status-dot"></span> Experience</div>
+          <div class="agent-status"><span class="status-dot"></span> Interview</div>
+          <div class="agent-status"><span class="status-dot"></span> Document</div>
+        </div>
+        <div class="context-section">
+          <h4>知识库</h4>
+          <p class="text-muted">0 个文档</p>
+        </div>
+        <div class="context-section">
+          <h4>最近面试</h4>
+          <p class="text-muted">暂无记录</p>
+        </div>
+        <div class="context-section">
+          <h4>项目统计</h4>
+          <p class="text-muted">聊天 0 · 经验 0 · 面试 0</p>
         </div>
       </div>
     </template>
@@ -190,12 +203,18 @@ const scrollToBottom = () => {
   justify-content: center;
   height: 100%;
   color: #999;
+  text-align: center;
 }
 
 .empty-state h2 {
   font-size: 24px;
   margin-bottom: 10px;
   color: #333;
+}
+
+.hint {
+  font-size: 12px;
+  margin-top: 10px;
 }
 
 .message {
@@ -216,6 +235,7 @@ const scrollToBottom = () => {
   align-items: center;
   justify-content: center;
   font-size: 16px;
+  flex-shrink: 0;
 }
 
 .message.user {
@@ -302,7 +322,6 @@ const scrollToBottom = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.2s;
 }
 
 .send-btn:disabled {
@@ -316,17 +335,18 @@ const scrollToBottom = () => {
 
 /* Context Panel */
 .context-content {
-  padding: 20px;
+  padding: 0;
 }
 
 .context-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .context-section h4 {
   font-size: 12px;
   color: #999;
   margin-bottom: 8px;
+  text-transform: uppercase;
 }
 
 .context-section p {

@@ -1,4 +1,4 @@
-// 路由配置
+// 路由配置 - 按照PRD页面设计
 
 import { createRouter, createWebHistory } from 'vue-router'
 
@@ -11,9 +11,20 @@ const router = createRouter({
       component: () => import('../views/Login.vue'),
     },
     {
+      path: '/register',
+      name: 'Register',
+      component: () => import('../views/Login.vue'),
+    },
+    {
       path: '/',
       name: 'Chat',
       component: () => import('../views/Chat.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/projects',
+      name: 'Projects',
+      component: () => import('../views/Projects.vue'),
       meta: { requiresAuth: true },
     },
     {
@@ -40,11 +51,17 @@ const router = createRouter({
       component: () => import('../views/Documents.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/settings',
+      name: 'Settings',
+      component: () => import('../views/Settings.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('token')
   if (to.meta.requiresAuth && !token) {
     next('/login')

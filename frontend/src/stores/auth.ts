@@ -12,7 +12,7 @@ interface User {
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
-  const token = ref<string | null>(localStorage.getItem('token'))
+  const token = ref<string>(localStorage.getItem('token') || '')
 
   // 登录
   async function login(email: string, password: string) {
@@ -31,7 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 登出
   function logout() {
-    token.value = null
+    token.value = ''
     user.value = null
     localStorage.removeItem('token')
   }

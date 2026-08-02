@@ -1,23 +1,26 @@
-<!-- ChatGPT风格布局 - 修复按钮点击 -->
+<!-- 主布局 - 按照PRD页面设计 -->
+<!-- 左侧：导航栏 | 中间：内容区 | 右侧：Project Context（可折叠） -->
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
 
 const router = useRouter()
-const route = useRoute()
 const authStore = useAuthStore()
 
+const rightPanelCollapsed = ref(false)
 const projects = ref<any[]>([])
 const showNewProjectDialog = ref(false)
 const newProjectName = ref('')
+const newProjectDesc = ref('')
 
 onMounted(async () => {
   await loadProjects()
 })
 
+// 加载项目列表
 const loadProjects = async () => {
   try {
     const response = await api.get('/projects')
@@ -27,11 +30,13 @@ const loadProjects = async () => {
   }
 }
 
+// 创建项目
 const createProject = async () => {
   if (!newProjectName.value.trim()) return
   try {
-    await api.post('/projects', { name: newProjectName.value })
+    await api.post('/projects', { name: newProjectName.value, description: newProjectDesc.value })
     newProjectName.value = ''
+    newProjectDesc.value = ''
     showNewProjectDialog.value = false
     await loadProjects()
   } catch (error) {
@@ -39,10 +44,18 @@ const createProject = async () => {
   }
 }
 
+// 导航
 const navigateTo = (path: string) => {
   router.push(path)
 }
 
+// 选择项目（跳转到聊天）
+const selectProject = (id: string) => {
+  localStorage.setItem('current_project_id', id)
+  navigateTo('/')
+}
+
+// 退出登录
 const logout = () => {
   authStore.logout()
   router.push('/login')
@@ -51,75 +64,91 @@ const logout = () => {
 
 <template>
   <div class="layout">
-    <!-- 侧边栏 -->
+    <!-- 左侧边栏 -->
     <aside class="sidebar">
-      <!-- 头部 -->
+      <!-- 顶部：标题+头像 -->
       <div class="sidebar-header">
         <div class="app-title">CareerPilot AI</div>
-        <div class="header-actions">
-          <div class="user-avatar" @click="logout">👤</div>
-        </div>
+        <div class="user-avatar" @click="logout" title="退出登录">👤</div>
       </div>
 
-      <!-- 内容区 -->
+      <!-- 导航内容 -->
       <div class="sidebar-content">
-        <!-- 新建聊天 -->
+        <!-- + New Chat -->
         <button class="new-chat-btn" @click="navigateTo('/')">
           + New Chat
         </button>
 
-        <!-- 最近聊天 -->
+        <!-- Recent Chats -->
         <div class="section">
           <div class="section-title">Recent Chats</div>
-          <div class="nav-item" @click="navigateTo('/')">Redis是什么</div>
-          <div class="nav-item" @click="navigateTo('/')">LangGraph</div>
-          <div class="nav-item" @click="navigateTo('/')">MCP</div>
+          <div class="nav-item" @click="navigateTo('/')">💬 最近聊天</div>
         </div>
 
-        <!-- 项目 -->
+        <!-- Projects -->
         <div class="section">
           <div class="section-header">
             <span class="section-title">Projects</span>
-            <button class="add-btn" @click="showNewProjectDialog = true">+</button>
+            <button class="add-btn" @click="showNewProjectDialog = true" title="新建项目">+</button>
           </div>
-          <div class="project-list">
-            <div
-              v-for="project in projects"
-              :key="project.id"
-              class="nav-item project-item"
-            >
-              <span class="nav-icon">📁</span>
-              <span>{{ project.name }}</span>
-            </div>
-            <div v-if="projects.length === 0" class="empty-text">暂无项目</div>
+          <div
+            v-for="project in projects"
+            :key="project.id"
+            class="nav-item project-item"
+            @click="selectProject(project.id)"
+          >
+            📁 {{ project.name }}
           </div>
+          <div v-if="projects.length === 0" class="empty-text">暂无项目，点击+新建</div>
         </div>
 
-        <!-- 知识库 -->
+        <!-- Knowledge Base -->
         <div class="section">
           <div class="section-title">Knowledge Base</div>
           <div class="nav-item" @click="navigateTo('/knowledge')">📚 知识库</div>
         </div>
+
+        <!-- Experience -->
+        <div class="section">
+          <div class="section-title">Experience</div>
+          <div class="nav-item" @click="navigateTo('/experience')">💡 经验</div>
+        </div>
+
+        <!-- Interview -->
+        <div class="section">
+          <div class="section-title">Interview</div>
+          <div class="nav-item" @click="navigateTo('/interview')">🎯 面试</div>
+        </div>
+
+        <!-- Documents -->
+        <div class="section">
+          <div class="section-title">Documents</div>
+          <div class="nav-item" @click="navigateTo('/documents')">📄 文档</div>
+        </div>
       </div>
 
-      <!-- 底部设置 -->
+      <!-- 底部：设置 -->
       <div class="sidebar-footer">
-        <div class="nav-item" @click="navigateTo('/experience')">💡 经验</div>
-        <div class="nav-item" @click="navigateTo('/interview')">🎯 面试</div>
-        <div class="nav-item" @click="navigateTo('/documents')">📄 文档</div>
         <div class="nav-item" @click="navigateTo('/settings')">⚙️ Settings</div>
       </div>
     </aside>
 
-    <!-- 主内容区 -->
+    <!-- 中间内容区 -->
     <main class="main-content">
       <slot />
     </main>
 
-    <!-- 右侧面板 -->
-    <aside class="context-panel">
-      <div class="panel-header">Context Panel</div>
-      <slot name="context" />
+    <!-- 右侧：Project Context（可折叠） -->
+    <aside class="context-panel" :class="{ collapsed: rightPanelCollapsed }">
+      <div class="panel-header">
+        <span>Project Context</span>
+        <button class="collapse-btn" @click="rightPanelCollapsed = !rightPanelCollapsed">
+          {{ rightPanelCollapsed ? '«' : '»' }}
+        </button>
+      </div>
+      <div v-if="!rightPanelCollapsed" class="panel-content">
+        <slot name="context" />
+      </div>
     </aside>
 
     <!-- 新建项目对话框 -->
@@ -127,6 +156,7 @@ const logout = () => {
       <div class="dialog">
         <h3>新建项目</h3>
         <input v-model="newProjectName" placeholder="项目名称" @keyup.enter="createProject" />
+        <textarea v-model="newProjectDesc" placeholder="项目描述（可选）" rows="2"></textarea>
         <div class="dialog-actions">
           <button class="cancel-btn" @click="showNewProjectDialog = false">取消</button>
           <button class="confirm-btn" @click="createProject">创建</button>
@@ -143,12 +173,14 @@ const logout = () => {
   background: #f5f5f5;
 }
 
+/* 左侧边栏 */
 .sidebar {
   width: 260px;
   background: #fff;
   border-right: 1px solid #e5e5e5;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .sidebar-header {
@@ -168,7 +200,12 @@ const logout = () => {
 .user-avatar {
   font-size: 20px;
   cursor: pointer;
-  padding: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.user-avatar:hover {
+  background: #f0f0f0;
 }
 
 .sidebar-content {
@@ -195,7 +232,7 @@ const logout = () => {
 }
 
 .section {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .section-header {
@@ -207,7 +244,8 @@ const logout = () => {
 .section-title {
   font-size: 12px;
   color: #999;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
 }
 
 .add-btn {
@@ -238,11 +276,6 @@ const logout = () => {
   background: #f0f0f0;
 }
 
-.project-list {
-  display: flex;
-  flex-direction: column;
-}
-
 .project-item {
   font-size: 13px;
 }
@@ -258,11 +291,7 @@ const logout = () => {
   border-top: 1px solid #e5e5e5;
 }
 
-.sidebar-footer .nav-item {
-  padding: 8px;
-  margin-bottom: 4px;
-}
-
+/* 中间内容 */
 .main-content {
   flex: 1;
   display: flex;
@@ -270,12 +299,19 @@ const logout = () => {
   overflow: hidden;
 }
 
+/* 右侧面板 */
 .context-panel {
   width: 280px;
   background: #fff;
   border-left: 1px solid #e5e5e5;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.3s;
+}
+
+.context-panel.collapsed {
+  width: 40px;
 }
 
 .panel-header {
@@ -284,9 +320,31 @@ const logout = () => {
   font-size: 14px;
   color: #333;
   border-bottom: 1px solid #e5e5e5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-/* Dialog */
+.collapse-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+}
+
+.collapse-btn:hover {
+  color: #000;
+}
+
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* 对话框 */
 .dialog-overlay {
   position: fixed;
   top: 0;
@@ -312,17 +370,21 @@ const logout = () => {
   color: #333;
 }
 
-.dialog input {
+.dialog input,
+.dialog textarea {
   width: 100%;
   padding: 12px;
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   font-size: 14px;
   outline: none;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  font-family: inherit;
+  resize: vertical;
 }
 
-.dialog input:focus {
+.dialog input:focus,
+.dialog textarea:focus {
   border-color: #000;
 }
 

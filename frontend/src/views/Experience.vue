@@ -6,6 +6,8 @@ import Layout from '../components/Layout.vue'
 import { getExperiences, createExperience, deleteExperience } from '../api/experience'
 import { ElMessage } from 'element-plus'
 
+const projectId = ref(localStorage.getItem('current_project_id') || '')
+
 const experiences = ref<any[]>([])
 const loading = ref(false)
 const showCreateDialog = ref(false)
@@ -25,7 +27,7 @@ onMounted(async () => {
 const loadExperiences = async () => {
   loading.value = true
   try {
-    const response = await getExperiences('current')
+    const response = await getExperiences(projectId.value)
     experiences.value = response.data
   } catch (error) {
     console.error('加载经验失败', error)
@@ -36,7 +38,7 @@ const loadExperiences = async () => {
 
 const handleCreate = async () => {
   try {
-    await createExperience('current', newExperience.value)
+    await createExperience(projectId.value, newExperience.value)
     ElMessage.success('创建成功')
     showCreateDialog.value = false
     newExperience.value = { title: '', type: 'bug', content: '', solution: '' }
@@ -48,7 +50,7 @@ const handleCreate = async () => {
 
 const handleDelete = async (id: string) => {
   try {
-    await deleteExperience('current', id)
+    await deleteExperience(projectId.value, id)
     ElMessage.success('删除成功')
     await loadExperiences()
   } catch (error) {

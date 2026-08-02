@@ -6,6 +6,8 @@ import Layout from '../components/Layout.vue'
 import { getDocuments, getDocument, updateDocument, generateDocument } from '../api/document'
 import { ElMessage } from 'element-plus'
 
+const projectId = ref(localStorage.getItem('current_project_id') || '')
+
 const documents = ref<any[]>([])
 const currentDoc = ref<any>(null)
 const loading = ref(false)
@@ -27,7 +29,7 @@ onMounted(async () => {
 const loadDocuments = async () => {
   loading.value = true
   try {
-    const response = await getDocuments('current')
+    const response = await getDocuments(projectId.value)
     documents.value = response.data
   } catch (error) {
     console.error('加载文档失败', error)
@@ -38,7 +40,7 @@ const loadDocuments = async () => {
 
 const viewDocument = async (docType: string) => {
   try {
-    const response = await getDocument('current', docType)
+    const response = await getDocument(projectId.value, docType)
     currentDoc.value = response.data
     editContent.value = response.data.content || ''
     editing.value = false
@@ -52,7 +54,7 @@ const startEdit = () => { editing.value = true }
 
 const saveDocument = async () => {
   try {
-    await updateDocument('current', currentDoc.value.doc_type, editContent.value)
+    await updateDocument(projectId.value, currentDoc.value.doc_type, editContent.value)
     ElMessage.success('保存成功')
     editing.value = false
     await viewDocument(currentDoc.value.doc_type)
@@ -64,7 +66,7 @@ const saveDocument = async () => {
 const handleGenerate = async (docType: string) => {
   generating.value = true
   try {
-    await generateDocument('current', docType)
+    await generateDocument(projectId.value, docType)
     ElMessage.success('生成成功')
     await viewDocument(docType)
   } catch (error) {
