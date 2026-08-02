@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
 
     class Config:
-        env_file = ".env"
+        # .env 在项目根目录（backend/ 的上一级）
+        env_file = "../.env"
         case_sensitive = True
 
 # 创建全局配置实例

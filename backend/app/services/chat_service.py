@@ -87,3 +87,13 @@ def get_messages(db: Session, chat_id: str, skip: int = 0, limit: int = 50):
     ).order_by(Message.created_at.asc()).offset(skip).limit(limit).all()
     total = db.query(Message).filter(Message.chat_id == chat_id).count()
     return messages, total
+
+
+# 将数据库消息转为LLM需要的格式 [{"role": "user", "content": "..."}]
+def messages_to_llm_history(db: Session, chat_id: str, limit: int = 10) -> list:
+    messages, _ = get_messages(db, chat_id, 0, limit)
+    history = []
+    for msg in messages:
+        if msg.role in ("user", "assistant"):
+            history.append({"role": msg.role, "content": msg.content})
+    return history

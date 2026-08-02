@@ -13,8 +13,10 @@ from app.services.chat_service import (
     delete_chat,
     send_message,
     ai_reply,
-    get_messages
+    get_messages,
+    messages_to_llm_history
 )
+from app.services.llm_service import chat_completion
 
 # 全局聊天路由
 router = APIRouter(prefix="/chats", tags=["全局聊天"])
@@ -80,20 +82,29 @@ message_router = APIRouter(prefix="/chats/{chat_id}/messages", tags=["消息"])
 
 # 发送消息
 @message_router.post("", response_model=MessageResponse)
-def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(get_db)):
+async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(get_db)):
     """
     发送消息并获取AI回复
     - content: 消息内容
     """
-    # 保存用户消息
+    # 1. 保存用户消息
     send_message(db, chat_id, message_data)
 
-    # 这里应该调用Agent处理，现在先返回简单回复
-    # TODO: 接入Multi-Agent系统
-    ai_content = f"收到你的消息：{message_data.content}"
+    # 2. 获取历史消息（供LLM理解上下文）
+    history = messages_to_llm_history(db, chat_id)
 
-    # 保存AI回复
-    ai_message = ai_reply(db, chat_id, ai_content)
+    # 3. 调用真实LLM生成回复
+    try:
+        ai_content = await chat_completion(history, message_data.content)
+        agent_used = "llm"
+    except Exception as e:
+        # LLM调用失败时返回友好提示
+        print(f"LLM调用失败: {e}")
+        ai_content = "（AI服务暂时不可用，请检查LLM配置：OPENAI_API_KEY 或 Ollama服务）"
+        agent_used = "error"
+
+    # 4. 保存AI回复
+    ai_message = ai_reply(db, chat_id, ai_content, agent_used)
 
     return ai_message
 
