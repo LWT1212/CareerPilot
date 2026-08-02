@@ -1,5 +1,5 @@
 <!-- 主布局 - 按照PRD页面设计 -->
-<!-- 左侧：导航栏 | 中间：内容区 | 右侧：Project Context（可折叠） -->
+<!-- 左侧：导航栏（项目可展开显示聊天和文档）| 中间：内容区 | 右侧：Project Context -->
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
@@ -18,9 +18,13 @@ const showNewProjectDialog = ref(false)
 const newProjectName = ref('')
 const newProjectDesc = ref('')
 
+// 当前展开的项目ID
+const expandedProjectId = ref<string>('')
+// 每个展开项目的详细数据 { projectId: { chats: [], docs: [] } }
+const projectDetails = ref<Record<string, { chats: any[]; docs: any[] }>>({})
+
 onMounted(async () => {
   await loadProjects()
-  // 刷新页面时恢复当前项目上下文
   if (projectStore.currentProjectId) {
     await projectStore.loadProjectDetail()
   }
@@ -31,6 +35,11 @@ const loadProjects = async () => {
   try {
     const response = await api.get('/projects')
     projects.value = response.data.items || []
+    // 恢复上次展开的项目
+    if (projectStore.currentProjectId) {
+      expandedProjectId.value = projectStore.currentProjectId
+      await toggleProject(projects.value.find(p => p.id === projectStore.currentProjectId), false)
+    }
   } catch (error) {
     console.error('加载项目失败', error)
   }
@@ -55,21 +64,60 @@ const navigateTo = (target: any) => {
   router.push(target)
 }
 
-// 选择项目（切换到项目上下文并进入聊天）
-const selectProject = async (id: string) => {
-  await projectStore.setProject(id)
-  router.push('/')
+// 展开/折叠项目
+const toggleProject = async (project: any, forceLoad: boolean = true) => {
+  if (!project) return
+
+  // 如果点击的是其他项目，先切换项目上下文
+  if (project.id !== projectStore.currentProjectId) {
+    await projectStore.setProject(project.id)
+  }
+
+  // 展开/折叠切换
+  if (expandedProjectId.value === project.id) {
+    expandedProjectId.value = ''
+  } else {
+    expandedProjectId.value = project.id
+    if (!projectDetails.value[project.id] || forceLoad) {
+      await loadProjectDetails(project.id)
+    }
+  }
 }
 
-// 选择聊天（切换当前聊天）
-const selectChat = (chat: any) => {
-  projectStore.selectChat(chat)
+// 加载展开项目的聊天和文档
+const loadProjectDetails = async (projectId: string) => {
+  try {
+    const [chatsRes, docsRes] = await Promise.all([
+      api.get(`/projects/${projectId}/chats`),
+      api.get(`/projects/${projectId}/knowledge`),
+    ])
+    projectDetails.value[projectId] = {
+      chats: chatsRes.data.items || chatsRes.data || [],
+      docs: docsRes.data || [],
+    }
+  } catch (error) {
+    console.error('加载项目详情失败', error)
+  }
+}
+
+// 点击项目下的聊天
+const selectChat = async (chat: any) => {
+  if (projectStore.currentProjectId !== chat.project_id) {
+    await projectStore.setProject(chat.project_id)
+  }
+  await projectStore.selectChat(chat)
+  router.push('/')
 }
 
 // 点击"+ New Chat"（触发新聊天）
 const handleNewChat = () => {
   projectStore.requestNewChat()
   router.push('/')
+}
+
+// 点击项目下的文档 → 进入知识库
+const goToKnowledge = () => {
+  navigateTo('/knowledge')
 }
 
 // 退出登录
@@ -97,35 +145,65 @@ const logout = () => {
           + New Chat
         </button>
 
-        <!-- Recent Chats -->
-        <div class="section">
-          <div class="section-title">Recent Chats</div>
-          <div
-            v-for="chat in projectStore.chats"
-            :key="chat.id"
-            class="nav-item chat-item"
-            :class="{ active: projectStore.currentChat?.id === chat.id }"
-            @click="selectChat(chat)"
-          >
-            💬 {{ chat.title || '新聊天' }}
-          </div>
-          <div v-if="projectStore.chats.length === 0" class="empty-text">暂无聊天</div>
-        </div>
-
-        <!-- Projects -->
+        <!-- Projects（可展开） -->
         <div class="section">
           <div class="section-header">
             <span class="section-title">Projects</span>
             <button class="add-btn" @click="showNewProjectDialog = true" title="新建项目">+</button>
           </div>
+
+          <!-- 项目列表 -->
           <div
             v-for="project in projects"
             :key="project.id"
-            class="nav-item project-item"
-            @click="selectProject(project.id)"
+            class="project-tree"
           >
-            📁 {{ project.name }}
+            <!-- 项目行（点击展开/折叠） -->
+            <div
+              class="project-row"
+              :class="{ expanded: expandedProjectId === project.id, active: projectStore.currentProjectId === project.id }"
+              @click="toggleProject(project)"
+            >
+              <span class="arrow">{{ expandedProjectId === project.id ? '▼' : '▶' }}</span>
+              <span class="project-icon">📁</span>
+              <span class="project-name">{{ project.name }}</span>
+            </div>
+
+            <!-- 展开的内容：聊天 + 文档 -->
+            <div v-if="expandedProjectId === project.id" class="project-details">
+              <!-- 该项目的聊天 -->
+              <div class="detail-label">💬 聊天</div>
+              <div
+                v-for="chat in projectDetails[project.id]?.chats || []"
+                :key="chat.id"
+                class="detail-item"
+                :class="{ active: projectStore.currentChat?.id === chat.id }"
+                @click="selectChat(chat)"
+              >
+                {{ chat.title || '新聊天' }}
+              </div>
+              <div
+                v-if="(projectDetails[project.id]?.chats || []).length === 0"
+                class="detail-empty"
+              >暂无聊天</div>
+
+              <!-- 该项目的文档 -->
+              <div class="detail-label">📄 文档</div>
+              <div
+                v-for="doc in projectDetails[project.id]?.docs || []"
+                :key="doc.id"
+                class="detail-item"
+                @click="goToKnowledge"
+              >
+                {{ doc.filename }}
+              </div>
+              <div
+                v-if="(projectDetails[project.id]?.docs || []).length === 0"
+                class="detail-empty"
+              >暂无文档，点击上方知识库上传</div>
+            </div>
           </div>
+
           <div v-if="projects.length === 0" class="empty-text">暂无项目，点击+新建</div>
         </div>
 
@@ -202,7 +280,7 @@ const logout = () => {
 
 /* 左侧边栏 */
 .sidebar {
-  width: 260px;
+  width: 280px;
   background: #fff;
   border-right: 1px solid #e5e5e5;
   display: flex;
@@ -303,8 +381,81 @@ const logout = () => {
   background: #f0f0f0;
 }
 
-.project-item {
+/* 项目树 */
+.project-tree {
+  margin-bottom: 4px;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+}
+
+.project-row:hover {
+  background: #f0f0f0;
+}
+
+.project-row.active {
+  background: #e8e8e8;
+}
+
+.arrow {
+  font-size: 10px;
+  color: #999;
+  width: 12px;
+}
+
+.project-icon {
+  font-size: 16px;
+}
+
+.project-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 展开的详情 */
+.project-details {
+  padding-left: 24px;
+  margin-bottom: 8px;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: #999;
+  padding: 8px 0 4px 8px;
+  text-transform: uppercase;
+}
+
+.detail-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
   font-size: 13px;
+  color: #555;
+}
+
+.detail-item:hover {
+  background: #f0f0f0;
+}
+
+.detail-item.active {
+  background: #e8e8e8;
+  color: #333;
+}
+
+.detail-empty {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #bbb;
 }
 
 .empty-text {
