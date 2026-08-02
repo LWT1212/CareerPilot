@@ -1,0 +1,36 @@
+# 生产环境编排 - 一键启动 nginx + backend
+# 使用: docker compose -f docker-compose.prod.yml up -d
+# 模型配置在 .env 中切换: LLM_PROVIDER=ollama 或 openai
+# RAG使用ChromaDB嵌入式模式（后端容器内运行，无需独立容器）
+
+services:
+  # 1. Nginx（前台：托管前端 + 代理API）
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"  # 宿主机8080 → 容器80（避开已占用的80端口）
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/dist:/usr/share/nginx/html
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # 2. 后端（FastAPI + LangGraph + RAG，内含ChromaDB）
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      - DATABASE_URL=sqlite:///./careerpilot.db
+      # LLM双引擎：从 .env 读取
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./chroma_data:/app/chroma_data
+      - ./backend/data:/app/data
+    restart: unless-stopped
