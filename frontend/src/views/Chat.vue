@@ -2,105 +2,79 @@
 <!-- 支持：普通聊天 / RAG知识检索 / 多Agent协作 -->
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { onMounted, watch, nextTick, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
-import { getMessages, sendMessage, createChat, getChats } from '../api/chat'
 
 const projectStore = useProjectStore()
 
-const chats = ref<any[]>([])
-const currentChat = ref<any>(null)
-const messages = ref<any[]>([])
 const inputMessage = ref('')
 const loading = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
 const projectId = ref(projectStore.currentProjectId)
+const messages = ref(projectStore.messages)
+const currentChat = ref(projectStore.currentChat)
 
 // 监听项目切换（点击侧边栏项目时触发）
 watch(
   () => projectStore.currentProjectId,
   (newId) => {
     projectId.value = newId
-    currentChat.value = null
-    messages.value = []
-    chats.value = []
-    loadChats()
+    messages.value = projectStore.messages
+    scrollToBottom()
+  }
+)
+
+// 监听聊天切换
+watch(
+  () => projectStore.currentChat,
+  (chat) => {
+    currentChat.value = chat
+    messages.value = projectStore.messages
+    scrollToBottom()
   }
 )
 
 // 监听"+ New Chat"请求（点击侧边栏New Chat时触发）
 watch(
   () => projectStore.newChatRequested,
-  () => {
-    handleNewChat()
+  async () => {
+    await handleNewChat()
   }
 )
 
 onMounted(async () => {
-  await loadChats()
+  // 页面刷新后恢复：加载项目聊天列表
+  if (projectStore.currentProjectId && projectStore.chats.length === 0) {
+    await projectStore.loadChats()
+    if (projectStore.chats.length > 0 && !projectStore.currentChat) {
+      await projectStore.selectChat(projectStore.chats[0])
+    }
+  }
 })
-
-// 加载聊天列表
-const loadChats = async () => {
-  try {
-    if (!projectId.value) {
-      chats.value = []
-      return
-    }
-    const response = await getChats(projectId.value)
-    chats.value = response.data.items || response.data || []
-    if (chats.value.length > 0 && !currentChat.value) {
-      await selectChat(chats.value[0])
-    }
-  } catch (error) {
-    console.error('加载聊天列表失败', error)
-  }
-}
-
-// 选择聊天
-const selectChat = async (chat: any) => {
-  currentChat.value = chat
-  await loadMessages(chat.id)
-}
-
-// 加载消息
-const loadMessages = async (chatId: string) => {
-  try {
-    const response = await getMessages(chatId)
-    messages.value = response.data.items || response.data || []
-    scrollToBottom()
-  } catch (error) {
-    console.error('加载消息失败', error)
-  }
-}
 
 // 发送消息
 const handleSend = async () => {
   if (!inputMessage.value.trim()) return
 
-  if (!projectId.value) {
+  if (!projectStore.currentProjectId) {
     alert('请先在左侧选择一个项目')
     return
   }
 
-  if (!currentChat.value) {
-    try {
-      const response = await createChat(projectId.value, { title: '新聊天' })
-      currentChat.value = response.data
-      await loadChats()
-    } catch (error) {
-      console.error('创建聊天失败', error)
-      return
-    }
+  // 如果没有当前聊天，先创建
+  if (!projectStore.currentChat) {
+    const chat = await projectStore.createNewChat()
+    if (!chat) return
   }
 
   const content = inputMessage.value
   inputMessage.value = ''
   loading.value = true
 
-  messages.value.push({
+  // 先显示用户消息
+  projectStore.messages.push({
     id: Date.now(),
     role: 'user',
     content: content
@@ -108,8 +82,10 @@ const handleSend = async () => {
   scrollToBottom()
 
   try {
-    await sendMessage(currentChat.value.id, content)
-    await loadMessages(currentChat.value.id)
+    await projectStore.sendMessageToChat(projectStore.currentChat.id, content)
+    await projectStore.loadMessages(projectStore.currentChat.id)
+    messages.value = projectStore.messages
+    scrollToBottom()
   } catch (error) {
     console.error('发送消息失败', error)
   } finally {
@@ -119,18 +95,13 @@ const handleSend = async () => {
 
 // 新建聊天
 const handleNewChat = async () => {
-  if (!projectId.value) {
+  if (!projectStore.currentProjectId) {
     alert('请先在左侧选择一个项目')
     return
   }
-  try {
-    const response = await createChat(projectId.value, { title: '新聊天' })
-    currentChat.value = response.data
-    messages.value = []
-    await loadChats()
-  } catch (error) {
-    console.error('创建聊天失败', error)
-  }
+  await projectStore.createNewChat()
+  messages.value = projectStore.messages
+  scrollToBottom()
 }
 
 // 滚动到底部
@@ -218,7 +189,7 @@ const scrollToBottom = () => {
         </div>
         <div class="context-section">
           <h4>项目统计</h4>
-          <p class="text-muted">聊天 0 · 经验 0 · 面试 0</p>
+          <p class="text-muted">聊天 {{ projectStore.chats.length }} · 经验 0 · 面试 0</p>
         </div>
       </div>
     </template>

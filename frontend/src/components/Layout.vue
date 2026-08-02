@@ -61,6 +61,11 @@ const selectProject = async (id: string) => {
   router.push('/')
 }
 
+// 选择聊天（切换当前聊天）
+const selectChat = (chat: any) => {
+  projectStore.selectChat(chat)
+}
+
 // 点击"+ New Chat"（触发新聊天）
 const handleNewChat = () => {
   projectStore.requestNewChat()
@@ -95,7 +100,16 @@ const logout = () => {
         <!-- Recent Chats -->
         <div class="section">
           <div class="section-title">Recent Chats</div>
-          <div class="nav-item" @click="navigateTo('/')">💬 最近聊天</div>
+          <div
+            v-for="chat in projectStore.chats"
+            :key="chat.id"
+            class="nav-item chat-item"
+            :class="{ active: projectStore.currentChat?.id === chat.id }"
+            @click="selectChat(chat)"
+          >
+            💬 {{ chat.title || '新聊天' }}
+          </div>
+          <div v-if="projectStore.chats.length === 0" class="empty-text">暂无聊天</div>
         </div>
 
         <!-- Projects -->
