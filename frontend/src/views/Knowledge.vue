@@ -40,10 +40,22 @@ const loadDocuments = async () => {
   }
 }
 
+// 当前项目名（用于显示关联项目）
+const projectName = ref(projectStore.currentProject?.name || '')
+
+// 监听项目对象变化，更新名称
+watch(
+  () => projectStore.currentProject?.name,
+  (name) => {
+    projectName.value = name || ''
+  }
+)
+
+// 上传成功提示（标明关联项目）
 const handleUpload = async (file: File) => {
   try {
     await uploadDocument(projectId.value, file)
-    ElMessage.success('上传成功')
+    ElMessage.success(`✅ 文档「${file.name}」已上传到项目：${projectName.value || projectId.value}`)
     await loadDocuments()
   } catch (error) {
     ElMessage.error('上传失败')
@@ -76,7 +88,8 @@ const handleSearch = async () => {
     <div class="knowledge-page">
       <div class="page-header">
         <h1>📚 知识库管理</h1>
-        <p>上传文档，构建项目知识库</p>
+        <p v-if="projectName">当前关联项目：<strong>{{ projectName }}</strong></p>
+        <p v-else>上传文档，构建项目知识库（请先在左侧选择项目）</p>
       </div>
 
       <!-- 上传区域 -->

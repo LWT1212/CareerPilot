@@ -22,6 +22,8 @@ const newProjectDesc = ref('')
 const expandedProjectId = ref<string>('')
 // 每个展开项目的详细数据 { projectId: { chats: [], docs: [] } }
 const projectDetails = ref<Record<string, { chats: any[]; docs: any[] }>>({})
+// 每个项目的上传文件 input 引用
+const uploadInputs = ref<Record<string, HTMLInputElement>>({})
 
 onMounted(async () => {
   await loadProjects()
@@ -125,12 +127,27 @@ const handleNewProjectChat = async (projectId: string) => {
   router.push('/')
 }
 
-// 项目下的文档 → 进入知识库（并设置当前项目）
-const goToKnowledge = async (projectId?: string) => {
-  if (projectId) {
-    await projectStore.setProject(projectId)
+// 项目内直接上传文档
+const handleUploadDoc = async (projectId: string, event: any) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  const project = projects.value.find(p => p.id === projectId)
+  const projectName = project?.name || projectId
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    await api.post(`/projects/${projectId}/knowledge`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    alert(`✅ 文档「${file.name}」已上传到项目：${projectName}`)
+    await loadProjectDetails(projectId)
+  } catch (error) {
+    alert(`❌ 上传失败：${(error as any)?.response?.data?.detail || '未知错误'}`)
   }
-  navigateTo('/knowledge')
+  // 清空 input 以便再次选择同一文件
+  event.target.value = ''
 }
 
 // 监听聊天列表变化，同步侧边栏
@@ -208,14 +225,8 @@ const logout = () => {
 
             <!-- 展开内容 -->
             <div v-if="expandedProjectId === project.id" class="project-details">
-              <!-- 项目操作 -->
-              <div class="project-actions">
-                <div class="new-chat-small" @click="handleNewProjectChat(project.id)">💬 新建聊天</div>
-                <div class="new-chat-small" @click="goToKnowledge(project.id)">📤 上传文档</div>
-              </div>
-
               <!-- 该项目的聊天 -->
-              <div class="detail-label">💬 聊天</div>
+              <div class="detail-label">💬 聊天 <span class="new-chat-small" @click="handleNewProjectChat(project.id)">+ 新建</span></div>
               <div
                 v-for="chat in projectDetails[project.id]?.chats || []"
                 :key="chat.id"
@@ -228,22 +239,28 @@ const logout = () => {
               <div
                 v-if="(projectDetails[project.id]?.chats || []).length === 0"
                 class="detail-empty"
-              >暂无聊天</div>
+              >暂无聊天，点"+ 新建"创建</div>
 
-              <!-- 该项目的文档 -->
-              <div class="detail-label">📄 文档</div>
+              <!-- 该项目的文档（内联上传） -->
+              <div class="detail-label">📄 文档 <span class="new-chat-small upload-btn" @click="() => (uploadInputs[project.id] || {}).click?.()">上传</span></div>
+              <input
+                type="file"
+                :ref="(el: any) => (uploadInputs[project.id] = el)"
+                style="display: none"
+                accept=".pdf,.docx,.md,.txt"
+                @change="handleUploadDoc(project.id, $event)"
+              />
               <div
                 v-for="doc in projectDetails[project.id]?.docs || []"
                 :key="doc.id"
                 class="detail-item"
-                @click="goToKnowledge(project.id)"
               >
-                {{ doc.filename }}
+                📄 {{ doc.filename }}
               </div>
               <div
                 v-if="(projectDetails[project.id]?.docs || []).length === 0"
                 class="detail-empty"
-              >暂无文档，点上方"上传文档"</div>
+              >暂无文档，点"上传"添加</div>
             </div>
           </div>
 
@@ -501,6 +518,21 @@ const logout = () => {
   color: #999;
   padding: 8px 0 4px 8px;
   text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-label .new-chat-small {
+  padding: 2px 10px;
+  font-size: 11px;
+  border: none;
+  flex: none;
+  border-radius: 4px;
+}
+
+.detail-label .new-chat-small:hover {
+  background: #f0f0f0;
 }
 
 .detail-item {
