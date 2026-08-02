@@ -31,6 +31,8 @@ onMounted(async () => {
   if (projectStore.currentProjectId) {
     await projectStore.loadProjectDetail()
     expandedProjectId.value = projectStore.currentProjectId
+    // 刷新页面时立即加载展开项目的聊天和文档
+    await loadProjectDetails(projectStore.currentProjectId)
   }
 })
 
@@ -74,9 +76,8 @@ const toggleProject = async (project: any) => {
     expandedProjectId.value = project.id
     // 展开时同步设置当前项目上下文（知识库/聊天都关联此项目）
     await projectStore.setProject(project.id)
-    if (!projectDetails.value[project.id]) {
-      await loadProjectDetails(project.id)
-    }
+    // 展开即加载该项目的聊天和文档（始终刷新，保证最新）
+    await loadProjectDetails(project.id)
   }
 }
 
