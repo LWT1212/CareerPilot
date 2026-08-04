@@ -81,7 +81,7 @@
 ### 第一批：多智能体核心（V1.1）
 | 任务 | 内容 |
 |------|------|
-| [ ] T13 O1 | Agent执行过程记录 + Agent真实工具 + 流式接入多智能体 |
+| [x] T13 O1 | Agent执行过程记录 + Agent真实工具 + 流式接入多智能体 |
 | [ ] T14 O2 | 结构化意图识别 + 项目上下文注入 + 上下文裁剪 |
 
 ### 第二批：记忆与成长（V1.2）
@@ -101,21 +101,60 @@
 
 ## T13 O1: Agent执行过程记录 + Agent真实工具 + 流式接入多智能体
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 已完成 (2026-08-02)
 
 ### 优化目标
 1. Agent 能真正操作数据库（记录经验、读取面试、保存文档）
-2. Agent 执行过程被记录并展示（agent_executions 表 + 前端面板）
+2. Agent 执行过程被记录并展示（agent_executions 表 + API）
 3. 流式接口也走多智能体
 
-### 优化方案
-_（实施后填写详细步骤）_
-
 ### 详细步骤
-_（实施后填写）_
+
+**A. Agent真实工具（agent_tools.py）**
+1. 新建 `backend/app/agents/agent_tools.py`，创建6个工具：
+   - `save_experience` 写经验（title/type/content/solution）
+   - `get_recent_experiences` 查最近经验
+   - `get_interview_stats` 面试统计+薄弱点
+   - `save_document` 保存/更新文档
+   - `get_document` 查询文档
+   - `search_project_knowledge` 语义检索知识库
+2. 定义 `TOOL_DESCRIPTIONS` 工具描述字典（供LLM判断调用）
+
+**B. LangGraph接入工具（langgraph_workflow.py 重构）**
+1. 状态扩展：`db`（数据库会话）+ `execution_log`
+2. 新增 `_agent_with_tools()` 通用Agent执行器：
+   - LLM判断是否需要工具（TOOL:工具名(参数=值) 或 NONE）
+   - 需要 → 解析参数 → 调用工具 → 基于结果回复
+   - 不需要 → 纯咨询回复（自动注入项目上下文）
+3. 各Agent节点改为使用 `_agent_with_tools`：
+   - knowledge → search_project_knowledge
+   - experience → save/get_recent_experiences
+   - interview → get_interview_stats
+   - document → save/get_document
+4. `_build_project_context()`：回复时注入项目经验+面试薄弱点+知识库
+
+**C. 执行过程记录（agent_executions）**
+1. 新建 `models/agent_execution.py`（AgentExecution模型）
+2. `_record_execution()` 记录 agent_type/input/output/duration_ms/status
+3. agents API 新增 `GET /api/v1/agents/executions`
+
+**D. 聊天接口传db**
+1. `chats.py` send 接口调用 `run_agent(..., db)` 传入数据库会话
+
+**E. 流式接入多智能体（/stream）**
+1. 先执行意图识别（复用coordinator逻辑）
+2. 发送 `agent` SSE事件（coordinator识别结果）
+3. 需要工具时执行工具并发送 `tool` 事件
+4. 最终回复 `stream_completion` 流式输出
+5. 发送 `done` 事件
 
 ### 遇到的问题
-_（实施后填写）_
+| 问题 | 解决 |
+|------|------|
+| Agent执行耗时较长（小模型工具判断慢） | 接受，T14结构化输出后改善 |
+| 意图识别小模型不准（Redis是什么→document） | T14 O2 解决（结构化识别） |
+| 工具参数解析靠文本分割，可能丢参数 | T14 O2 用结构化输出 |
+| type字段工具解析时未传导致默认lesson | 同上 |
 
 ---
 
