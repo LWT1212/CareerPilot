@@ -150,41 +150,100 @@ def list_messages(chat_id: str, skip: int = 0, limit: int = 50, db: Session = De
     return MessageListResponse(items=messages, total=total)
 
 
-# 流式发送消息（SSE）
+# 流式发送消息（SSE）- 走多智能体调度
 @message_router.post("/stream")
 async def stream_send(chat_id: str, message_data: MessageCreate, db: Session = Depends(get_db)):
     """
     流式发送消息（SSE）
-    前端实时显示AI逐字回复
+    1. 多智能体意图识别（发送agent事件）
+    2. 必要时执行Agent工具
+    3. 最终回复流式输出
     """
     from fastapi.responses import StreamingResponse
+    from app.agents.langgraph_workflow import coordinator_node
+    from app.services.llm_service import chat_completion, stream_completion
+    from app.agents.agent_tools import TOOL_DESCRIPTIONS, TOOLS
 
     # 1. 保存用户消息
     send_message(db, chat_id, message_data)
 
-    # 2. 获取历史消息
+    # 2. 获取历史消息 + 项目
     history = messages_to_llm_history(db, chat_id)
-
-    # 3. 构建RAG上下文（项目聊天自动检索知识库）
-    system_prompt = _build_system_prompt(db, chat_id, message_data.content)
+    chat = get_chat(db, chat_id)
+    project_id = chat.project_id if chat else None
 
     async def event_generator():
         full_content = ""
         try:
-            # 流式获取LLM回复
+            # 3. 意图识别（复用LangGraph的coordinator节点逻辑）
+            intent = "chat"
+            try:
+                intent_raw = await chat_completion(
+                    [], message_data.content,
+                    "你是任务调度器。判断用户消息的意图，只返回以下之一：knowledge/experience/interview/document/chat。只返回单词。"
+                )
+                for valid in ["knowledge", "experience", "interview", "document", "chat"]:
+                    if valid in intent_raw.lower():
+                        intent = valid
+                        break
+            except Exception:
+                intent = "chat"
+
+            # 发送Agent调度事件
+            yield f"data: {json.dumps({'type': 'agent', 'name': 'coordinator', 'status': 'recognized', 'intent': intent})}\n\n"
+
+            # 4. 简单工具执行（经验/文档保存类）
+            if intent in ("experience", "document") and project_id:
+                tool_desc = "\n".join(f"- {name}: {TOOL_DESCRIPTIONS[name]}" for name in TOOL_DESCRIPTIONS)
+                try:
+                    decision = await chat_completion(
+                        [], message_data.content,
+                        f"判断是否调用工具（{tool_desc}）。调用则输出 TOOL:工具名(参数=值)；否则 NONE。只输出一行。"
+                    )
+                    if decision.strip().startswith("TOOL:"):
+                        tool_line = decision.strip()[5:]
+                        tool_name = tool_line.split("(")[0].strip()
+                        args = {}
+                        if "(" in tool_line:
+                            for pair in tool_line.split("(", 1)[1].rstrip(")").split(","):
+                                if "=" in pair:
+                                    k, v = pair.split("=", 1)
+                                    args[k.strip()] = v.strip().strip("'\"")
+                        if tool_name in TOOLS and db is not None:
+                            args["db"] = db
+                            args["project_id"] = project_id
+                            tool_result = TOOLS[tool_name](**args)
+                            yield f"data: {json.dumps({'type': 'agent', 'name': intent, 'status': 'tool', 'tool': tool_name, 'message': tool_result.get('message', '')})}\n\n"
+                except Exception as e:
+                    print(f"工具执行失败: {e}")
+
+            # 5. 流式生成最终回复
+            system_prompt = ""
+            if intent == "knowledge" and project_id:
+                from app.services.rag_service import build_rag_context
+                context = build_rag_context(project_id, message_data.content, top_k=3)
+                if context:
+                    system_prompt = f"你是知识助手，请基于资料回答：\n【资料】\n{context}"
+            elif intent == "experience":
+                system_prompt = "你是经验助手，帮助开发者整理开发经验和解决方案。"
+            elif intent == "interview":
+                system_prompt = "你是面试助手，分析面试表现、识别薄弱点、给出学习建议。"
+            elif intent == "document":
+                system_prompt = "你是文档助手，生成结构清晰专业的文档。"
+            else:
+                system_prompt = "你是CareerPilot AI助手，帮助开发者进行技术讨论。"
+
             async for chunk in stream_completion(history, message_data.content, system_prompt):
                 full_content += chunk
-                # SSE格式：data: {...}\n\n
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
         except Exception as e:
-            print(f"LLM流式调用失败: {e}")
+            print(f"多智能体流式调用失败: {e}")
             error_msg = "（AI服务暂时不可用，请检查LLM配置）"
             full_content = error_msg
             yield f"data: {json.dumps({'type': 'chunk', 'content': error_msg})}\n\n"
 
-        # 3. 保存完整的AI回复
-        ai_reply(db, chat_id, full_content, "llm")
-        # 发送完成事件
+        # 保存完整的AI回复
+        ai_reply(db, chat_id, full_content, intent)
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(
