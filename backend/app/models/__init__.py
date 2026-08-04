@@ -6,8 +6,10 @@ from app.models.knowledge import KnowledgeDocument
 from app.models.experience import Experience
 from app.models.interview import Interview, InterviewQuestion
 from app.models.document import Document
+from app.models.agent_execution import AgentExecution
 
 __all__ = [
     "User", "Project", "Chat", "Message", "KnowledgeDocument",
-    "Experience", "Interview", "InterviewQuestion", "Document"
+    "Experience", "Interview", "InterviewQuestion", "Document",
+    "AgentExecution"
 ]

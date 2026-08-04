@@ -90,3 +90,24 @@ async def chat(input_data: dict, db: Session = Depends(get_db)):
         "intent": result,
         "response": response
     }
+
+
+# 获取Agent执行记录
+@router.get("/executions")
+def get_executions(limit: int = 20, db: Session = Depends(get_db)):
+    """获取最近Agent执行记录"""
+    from app.models.agent_execution import AgentExecution
+    executions = db.query(AgentExecution).order_by(
+        AgentExecution.created_at.desc()
+    ).limit(limit).all()
+    return [
+        {
+            "id": e.id,
+            "agent_type": e.agent_type,
+            "duration_ms": e.duration_ms,
+            "status": e.status,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+            "output": e.output_data,
+        }
+        for e in executions
+    ]

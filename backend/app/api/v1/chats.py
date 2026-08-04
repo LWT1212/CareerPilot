@@ -122,10 +122,10 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
     chat = get_chat(db, chat_id)
     project_id = chat.project_id if chat else None
 
-    # 4. 调用LangGraph多智能体工作流
+    # 4. 调用LangGraph多智能体工作流（传入db让Agent能操作数据库）
     try:
         from app.agents.langgraph_workflow import run_agent
-        result = await run_agent(message_data.content, project_id or "", history)
+        result = await run_agent(message_data.content, project_id or "", history, db)
         ai_content = result.get("response", "")
         agent_used = result.get("intent", "llm")
         if not ai_content:
