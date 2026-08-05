@@ -5,12 +5,63 @@ import { onMounted, watch, nextTick, ref } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
 import { streamMessage } from '../api/chat'
+import {
+  getLearningPlans,
+  getNotifications,
+  markNotificationRead,
+  getAgentExecutions,
+  getProjectMemories,
+} from '../api/proactive'
 
 const projectStore = useProjectStore()
 
 const inputMessage = ref('')
 const loading = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
+
+// === 右侧面板数据（T13-T16成果展示）===
+const learningPlans = ref<any[]>([])
+const notifications = ref<any[]>([])
+const agentExecutions = ref<any[]>([])
+const projectMemories = ref<any[]>([])
+
+// 加载右侧面板数据
+const loadContextData = async () => {
+  const pid = projectStore.currentProjectId
+  if (!pid) return
+
+  try {
+    const [plans, notifs, memories] = await Promise.all([
+      getLearningPlans(pid),
+      getNotifications(pid),
+      getProjectMemories(pid),
+    ])
+    learningPlans.value = plans.data || []
+    notifications.value = notifs.data || []
+    projectMemories.value = memories.data?.memories || []
+  } catch (error) {
+    console.error('加载面板数据失败', error)
+  }
+}
+
+// 标记提醒已读
+const handleMarkRead = async (notifId: string) => {
+  try {
+    await markNotificationRead(projectStore.currentProjectId, notifId)
+    await loadContextData()
+  } catch (error) {
+    console.error('标记已读失败', error)
+  }
+}
+
+// Agent执行记录标签
+const agentTypeLabel = (type: string) => {
+  if (type.includes('tool:')) {
+    const [agent, tool] = type.split('(tool:')
+    return `${agent} ⚙️${tool?.replace(')', '') || ''}`
+  }
+  return type
+}
 
 // 页面挂载时恢复当前状态（支持全局模式和项目模式）
 onMounted(async () => {
@@ -32,13 +83,23 @@ onMounted(async () => {
     }
   }
   scrollToBottom()
+  // 加载右侧面板数据（学习计划/提醒/记忆）
+  await loadContextData()
+  // 加载Agent执行记录
+  try {
+    const execs = await getAgentExecutions(10)
+    agentExecutions.value = execs.data || []
+  } catch (error) {
+    console.error('加载执行记录失败', error)
+  }
 })
 
-// 监听当前项目变化 → 清空消息
+// 监听当前项目变化 → 清空消息 + 加载面板数据
 watch(
   () => projectStore.currentProjectId,
   () => {
     scrollToBottom()
+    loadContextData()
   }
 )
 
@@ -183,37 +244,50 @@ const scrollToBottom = () => {
           <h4>当前项目</h4>
           <p>{{ projectStore.currentProject?.name || '未选择' }}</p>
         </div>
-        <div class="context-section">
-          <h4>当前聊天</h4>
-          <p>{{ projectStore.currentChat?.title || '未选择' }}</p>
+
+        <!-- 🔔 AI提醒（T16主动成长） -->
+        <div class="context-section" v-if="notifications.length > 0">
+          <h4>🔔 AI提醒</h4>
+          <div v-for="n in notifications" :key="n.id" class="notif-item" :class="{ unread: !n.is_read }">
+            <div class="notif-title">{{ n.title }}</div>
+            <div class="notif-content">{{ n.content }}</div>
+            <button v-if="!n.is_read" class="notif-read-btn" @click="handleMarkRead(n.id)">标记已读</button>
+          </div>
         </div>
-        <div class="context-section">
-          <h4>最近更新</h4>
-          <p class="text-muted">暂无更新</p>
+
+        <!-- 📚 学习计划（T16薄弱点） -->
+        <div class="context-section" v-if="learningPlans.length > 0">
+          <h4>📚 学习计划</h4>
+          <div v-for="plan in learningPlans" :key="plan.id" class="plan-item">
+            <div class="plan-title">{{ plan.title }}</div>
+            <div class="plan-meta">薄弱{{ plan.weak_count }}次</div>
+            <div class="plan-content">{{ plan.content }}</div>
+          </div>
         </div>
-        <div class="context-section">
-          <h4>AI建议</h4>
-          <p class="text-muted">暂无建议</p>
+
+        <!-- 🧠 项目记忆（T15长期记忆） -->
+        <div class="context-section" v-if="projectMemories.length > 0">
+          <h4>🧠 项目记忆</h4>
+          <div v-for="m in projectMemories" :key="m.id" class="memory-item">
+            <span class="memory-type">{{ m.memory_type }}</span>
+            {{ m.content }}
+          </div>
         </div>
+
+        <!-- ⚙️ Agent执行（T13执行记录） -->
         <div class="context-section">
-          <h4>Agent执行</h4>
-          <div class="agent-status"><span class="status-dot active"></span> Coordinator</div>
-          <div class="agent-status"><span class="status-dot active"></span> Knowledge</div>
-          <div class="agent-status"><span class="status-dot"></span> Experience</div>
-          <div class="agent-status"><span class="status-dot"></span> Interview</div>
-          <div class="agent-status"><span class="status-dot"></span> Document</div>
+          <h4>⚙️ Agent执行</h4>
+          <div v-if="agentExecutions.length === 0" class="text-muted">暂无执行记录</div>
+          <div v-for="exec in agentExecutions" :key="exec.id" class="exec-item">
+            <span class="exec-agent">{{ agentTypeLabel(exec.agent_type) }}</span>
+            <span class="exec-status" :class="exec.status">{{ exec.status }}</span>
+            <span class="exec-time">{{ exec.duration_ms }}ms</span>
+          </div>
         </div>
-        <div class="context-section">
-          <h4>知识库</h4>
-          <p class="text-muted">上传文档后显示</p>
-        </div>
-        <div class="context-section">
-          <h4>最近面试</h4>
-          <p class="text-muted">暂无记录</p>
-        </div>
+
         <div class="context-section">
           <h4>项目统计</h4>
-          <p class="text-muted">聊天 {{ projectStore.chats.length }} · 经验 0 · 面试 0</p>
+          <p class="text-muted">聊天 {{ projectStore.chats.length }} · 学习计划 {{ learningPlans.length }}</p>
         </div>
       </div>
     </template>
@@ -417,3 +491,120 @@ const scrollToBottom = () => {
   background: #10b981;
 }
 </style>
+
+/* === 右侧面板：提醒/学习计划/记忆/执行记录 === */
+.notif-item {
+  padding: 10px;
+  border-radius: 8px;
+  background: #fff8e6;
+  margin-bottom: 8px;
+  border: 1px solid #f0e0b0;
+}
+
+.notif-item.unread {
+  background: #fff3cc;
+  border-color: #e8c860;
+}
+
+.notif-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #8a6d00;
+  margin-bottom: 4px;
+}
+
+.notif-content {
+  font-size: 12px;
+  color: #666;
+}
+
+.notif-read-btn {
+  margin-top: 6px;
+  font-size: 11px;
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: #888;
+}
+
+.plan-item {
+  padding: 10px;
+  border-radius: 8px;
+  background: #f0f7ff;
+  margin-bottom: 8px;
+  border: 1px solid #c8dff0;
+}
+
+.plan-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1a5a8a;
+}
+
+.plan-meta {
+  font-size: 11px;
+  color: #e67e22;
+  margin: 2px 0;
+}
+
+.plan-content {
+  font-size: 12px;
+  color: #555;
+  white-space: pre-wrap;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.memory-item {
+  font-size: 12px;
+  color: #555;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.memory-type {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 11px;
+  margin-right: 6px;
+}
+
+.exec-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #555;
+  padding: 5px 0;
+}
+
+.exec-agent {
+  font-weight: 500;
+  color: #333;
+}
+
+.exec-status {
+  font-size: 11px;
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.exec-status.success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.exec-status.failed {
+  background: #fdecea;
+  color: #c62828;
+}
+
+.exec-time {
+  color: #aaa;
+  font-size: 11px;
+  margin-left: auto;
+}
