@@ -38,3 +38,18 @@ class ExperienceExtractOutput(BaseModel):
     )
     content: str = Field(description="问题/经验内容")
     solution: Optional[str] = Field(default=None, description="解决方案")
+
+
+# ============ 记忆提取输出 ============
+class MemoryItem(BaseModel):
+    """单条记忆"""
+    memory_type: Literal["decision", "progress", "problem", "preference"] = Field(
+        description="记忆类型: decision=决策, progress=进度, problem=问题, preference=偏好"
+    )
+    content: str = Field(description="记忆内容，一句话概括")
+    importance: int = Field(default=3, ge=1, le=5, description="重要度1-5")
+
+
+class MemoriesExtractOutput(BaseModel):
+    """从对话提取多条记忆"""
+    memories: list[MemoryItem] = Field(default_factory=list, description="提取出的记忆列表")
