@@ -87,7 +87,7 @@
 ### 第二批：记忆与成长（V1.2）
 | 任务 | 内容 |
 |------|------|
-| [ ] T15 O3 | 长期记忆系统 |
+| [x] T15 O3 | 长期记忆系统 |
 | [ ] T16 O4 | 主动成长能力（薄弱点学习计划） |
 
 ### 第三批：生态扩展（V2）
@@ -217,16 +217,47 @@
 
 ## T15 O3: 长期记忆系统
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 已完成 (2026-08-02)
 
 ### 优化目标
-_（待填写）_
+让AI跨会话记住项目：决策/进度/问题/偏好，不再"每次都是新开始"
 
 ### 详细步骤
-_（实施后填写）_
+
+**S1. 建表**
+1. `models/project_memory.py`：ProjectMemory（memory_type: decision/progress/problem/preference, content, importance 1-5, source_chat_id）
+2. `models/chat_summary.py`：ChatSummary（chat_id, summary）
+3. 注册到 models/__init__.py
+
+**S2. 记忆服务（memory_service.py）**
+1. `add_memory()`：写入+去重（同项目+同类型+前50字符相同跳过）
+2. `get_project_memories()`：按重要度降序读取
+3. `get_recent_summaries()`：读取对话摘要
+4. `build_memory_prompt()`：组装记忆注入提示词
+5. `extract_memories_from_messages()`：LLM从对话提取记忆（async）
+6. `MemoriesExtractOutput` schema（嵌套 MemoryItem：type/content/importance）
+
+**S3. 沉淀触发**
+1. chats.py send接口：每5条消息触发 `extract_memories_from_messages`
+
+**S4. 召回注入**
+1. `_agent_with_tools`：开头注入 build_memory_prompt 结果
+2. chat_node：注入项目记忆（之前漏了）
+3. 工具无结果时 `_answer_with_memory()`：注入记忆再回答
+4. 新增 `GET /projects/{id}/memories` 查询API
 
 ### 遇到的问题
-_（实施后填写）_
+| 问题 | 解决 |
+|------|------|
+| import错误 app.models.message | 改为 app.models.chat |
+| 嵌套schema字段描述不全（memory_type枚举丢失） | _schema_field_description支持嵌套+Literal枚举 |
+| 工具返回list时 tool_result.get崩溃 | 兼容dict/list/空 三种返回 |
+| chat_node不注入记忆 | chat_node单独加记忆注入 |
+| 知识Agent查询无结果不引用记忆 | 工具无结果时_answer_with_memory兜底 |
+
+### 验证
+- 沉淀：对话提取4条记忆（decision/preference/problem/progress）✅
+- 召回：新会话问"前端框架"→ AI回答"Vue3" ✅
 
 ---
 
