@@ -125,14 +125,42 @@ async def structured_completion(schema_model, user_message: str,
 
 
 def _schema_field_description(schema_model) -> str:
-    """从Pydantic模型生成简洁的字段描述"""
+    """从Pydantic模型生成简洁的字段描述（支持嵌套模型+Literal枚举）"""
+    import typing
+    from pydantic import BaseModel
+
+    def _describe(field) -> str:
+        """生成单个字段描述"""
+        annotation = field.annotation
+        desc = field.description or ""
+
+        # Literal 枚举：列出合法值
+        if hasattr(annotation, "__origin__") and annotation.__origin__ is typing.Literal:
+            values = annotation.__args__
+            return f"(枚举:{'或'.join(str(v) for v in values)}) {desc}"
+
+        # 嵌套 Pydantic 模型：递归生成子字段描述
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            sub = _schema_field_description(annotation)
+            return f"(对象: {{{sub}}}) {desc}"
+
+        # list[Model] 嵌套
+        if hasattr(annotation, "__origin__") and annotation.__origin__ is list:
+            args = annotation.__args__
+            if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
+                sub = _schema_field_description(args[0])
+                return f"(对象数组: [{{{sub}}}]) {desc}"
+
+        # 普通类型
+        if hasattr(annotation, "__name__"):
+            return f"({annotation.__name__}) {desc}"
+        return f"({annotation}) {desc}"
+
     fields = []
     for name, field in schema_model.model_fields.items():
-        field_type = field.annotation.__name__ if hasattr(field.annotation, "__name__") else str(field.annotation)
         default = field.default
-        desc = field.description or ""
         if default is not None and default != "":
-            fields.append(f"{name}({field_type}, 默认{default})={desc}")
+            fields.append(f"{name}{_describe(field)}, 默认{default}")
         else:
-            fields.append(f"{name}({field_type})={desc}")
+            fields.append(f"{name}{_describe(field)}")
     return "; ".join(fields)

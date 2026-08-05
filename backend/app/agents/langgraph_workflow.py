@@ -113,6 +113,15 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
     project_id = state.get("project_id")
     response = ""
 
+    # 0. 注入项目长期记忆（跨会话回忆）
+    memory_prompt = ""
+    if db is not None and project_id:
+        try:
+            from app.services.memory_service import build_memory_prompt
+            memory_prompt = build_memory_prompt(db, project_id)
+        except Exception as e:
+            print(f"记忆注入失败: {e}")
+
     # 1. 构建工具描述
     available_tools = {k: v for k, v in TOOL_DESCRIPTIONS.items() if k in tool_map}
     tool_desc = "\n".join(f"- {name}: {desc}" for name, desc in available_tools.items())
@@ -143,9 +152,19 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
             tool_args["db"] = db
             tool_args["project_id"] = project_id
 
-            # 4. 执行工具
+            # 4. 执行工具（兼容dict和list返回）
             tool_result = tool_map[tool_name](**tool_args)
-            response = tool_result.get("message", str(tool_result))
+            if isinstance(tool_result, dict):
+                response = tool_result.get("message", str(tool_result))
+            elif isinstance(tool_result, list) and tool_result:
+                response = f"查询到 {len(tool_result)} 条记录：\n" + "\n".join(
+                    str(item) for item in tool_result[:5]
+                )
+            elif not tool_result:
+                # 工具无结果：注入项目记忆再回答（跨会话回忆）
+                response = await _answer_with_memory(state, agent_name, base_prompt, memory_prompt)
+            else:
+                response = str(tool_result)
 
             _record_execution(db, f"{agent_name}(tool:{tool_name})",
                               {"message": message}, {"result": response},
@@ -155,6 +174,10 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
             system_prompt = base_prompt
             # 项目上下文增强（按Agent类型注入不同数据）
             if db is not None and project_id:
+                # 长期记忆注入（跨会话）
+                if memory_prompt:
+                    system_prompt += f"\n\n{memory_prompt}"
+                # 项目当前数据
                 ctx = _build_project_context(db, project_id, message, agent_name)
                 if ctx:
                     system_prompt += f"\n\n【项目当前数据】\n{ctx}"
@@ -173,6 +196,20 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
                           {"error": str(e)}, int((time.time() - start) * 1000), "failed")
 
     return {"response": response}
+
+
+async def _answer_with_memory(state: AgentState, agent_name: str,
+                              base_prompt: str, memory_prompt: str) -> str:
+    """工具无结果时，注入项目记忆生成回复"""
+    system_prompt = base_prompt
+    if memory_prompt:
+        system_prompt += (
+            f"\n\n以下是该项目的历史记忆，用户可能在问项目历史问题，请结合记忆回答：\n{memory_prompt}"
+        )
+    response = await chat_completion(
+        state.get("chat_history", []), state["message"], system_prompt
+    )
+    return response
 
 
 def _build_project_context(db: Session, project_id: str, message: str, agent_name: str = "") -> str:
@@ -262,10 +299,23 @@ async def document_node(state: AgentState) -> AgentState:
 
 
 async def chat_node(state: AgentState) -> AgentState:
-    """普通对话Agent"""
+    """普通对话Agent（注入项目长期记忆）"""
+    system_prompt = "你是CareerPilot AI助手，帮助开发者进行技术讨论和日常问答。"
+
+    # 注入项目长期记忆（跨会话回忆）
+    db = state.get("db")
+    project_id = state.get("project_id")
+    if db is not None and project_id:
+        try:
+            from app.services.memory_service import build_memory_prompt
+            memory_prompt = build_memory_prompt(db, project_id)
+            if memory_prompt:
+                system_prompt += f"\n\n以下是该项目的历史记忆，回答时请结合这些信息（如果用户问的是项目历史相关问题，请直接引用记忆回答）：\n{memory_prompt}"
+        except Exception as e:
+            print(f"chat记忆注入失败: {e}")
+
     response = await chat_completion(
-        state.get("chat_history", []), state["message"],
-        "你是CareerPilot AI助手，帮助开发者进行技术讨论和日常问答。"
+        state.get("chat_history", []), state["message"], system_prompt
     )
     return {"response": response}
 

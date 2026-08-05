@@ -139,6 +139,17 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
     # 5. 保存AI回复
     ai_message = ai_reply(db, chat_id, ai_content, agent_used)
 
+    # 6. 沉淀记忆（每5条消息触发一次，LLM提取决策/进度/问题/偏好）
+    if project_id:
+        try:
+            from app.models.chat import Message as MsgModel
+            from app.services.memory_service import extract_memories_from_messages
+            count = db.query(MsgModel).filter(MsgModel.chat_id == chat_id).count()
+            if count % 5 == 0 and count >= 5:
+                await extract_memories_from_messages(db, chat_id, project_id)
+        except Exception as e:
+            print(f"记忆沉淀失败: {e}")
+
     return ai_message
 
 

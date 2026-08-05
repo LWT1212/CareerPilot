@@ -93,3 +93,36 @@ def delete(
     if not success:
         raise HTTPException(status_code=404, detail="项目不存在")
     return {"message": "删除成功"}
+
+
+# 获取项目记忆
+@router.get("/{project_id}/memories")
+def get_memories(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取项目长期记忆"""
+    from app.services.memory_service import get_project_memories, get_recent_summaries
+
+    # 校验项目归属
+    project = get_project(db, project_id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    memories = get_project_memories(db, project_id, importance_min=1, limit=50)
+    summaries = get_recent_summaries(db, project_id=project_id, limit=10)
+
+    return {
+        "memories": [
+            {
+                "id": m.id,
+                "memory_type": m.memory_type,
+                "content": m.content,
+                "importance": m.importance,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in memories
+        ],
+        "summaries": [s.summary for s in summaries],
+    }
