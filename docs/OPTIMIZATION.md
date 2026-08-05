@@ -82,7 +82,7 @@
 | 任务 | 内容 |
 |------|------|
 | [x] T13 O1 | Agent执行过程记录 + Agent真实工具 + 流式接入多智能体 |
-| [ ] T14 O2 | 结构化意图识别 + 项目上下文注入 + 上下文裁剪 |
+| [x] T14 O2 | 结构化意图识别 + 项目上下文注入 + 上下文裁剪 |
 
 ### 第二批：记忆与成长（V1.2）
 | 任务 | 内容 |
@@ -160,16 +160,58 @@
 
 ## T14 O2: 结构化意图识别 + 项目上下文注入 + 上下文裁剪
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 已完成 (2026-08-02)
 
 ### 优化目标
-_（待填写）_
+1. 结构化意图识别（解决小模型误判，Redis是什么→document）
+2. 结构化工具调用（解决参数丢失，type字段）
+3. 项目上下文按Agent类型注入
+4. 上下文裁剪（长对话token管理）
 
 ### 详细步骤
-_（实施后填写）_
+
+**A. 结构化Schema（agent_schemas.py）**
+1. 新建 `backend/app/agents/agent_schemas.py`，创建4个Pydantic模型：
+   - `IntentOutput`: intent(Literal) + confidence(0-1) + project_related
+   - `ToolCallOutput`: use_tool(bool) + tool(名字) + arguments(dict)
+   - `SummaryOutput`: summary
+   - `ExperienceExtractOutput`: title/exp_type/content/solution
+
+**B. 结构化输出函数（llm_service.py）**
+1. 新增 `structured_completion()`：
+   - 提示词用**文字描述字段**（不贴完整schema JSON，小模型生成量小、快）
+   - 让LLM输出纯JSON → Pydantic解析
+   - 清理markdown代码块
+2. 新增 `_schema_field_description()`：从Pydantic模型生成简洁字段描述
+
+**C. LangGraph改造（langgraph_workflow.py）**
+1. coordinator_node：用 `structured_completion(IntentOutput)` 识别意图
+   - 置信度<0.4时兜底为chat
+2. _agent_with_tools：用 `structured_completion(ToolCallOutput)` 判断工具
+   - 使用schema的arguments字段（不再文本分割，参数不丢失）
+   - save_experience直接映射arguments到工具参数
+3. _build_project_context：按Agent类型注入不同上下文
+   - experience → 最近经验(5条)
+   - interview → 面试统计+薄弱点
+   - knowledge → RAG检索(3条)
+   - document → 现有文档列表
+
+**D. 上下文裁剪（chat_service.py）**
+1. messages_to_llm_history：单条消息超过2000字符截断
+
+**E. 阿里云接入**
+1. config.py 新增 `OPENAI_BASE_URL`
+2. llm_service openai分支：有base_url时使用自定义端点
+3. .env 切换：LLM_PROVIDER=openai + 阿里云key + qwen模型 + dashscope base_url
 
 ### 遇到的问题
-_（实施后填写）_
+| 问题 | 解决 |
+|------|------|
+| 本地3b小模型生成JSON极慢（30-60s/次，串行超时） | 切换到阿里云qwen模型（4-6秒/次） |
+| 完整schema JSON塞提示词导致生成慢 | 改用文字描述字段（_schema_field_description） |
+| .env中文注释缺#号导致dotenv解析警告 | 补上#注释符 |
+| 工具参数曾丢失type字段 | ToolCallOutput.arguments结构化传递 |
+| save_experience曾多一次LLM提取调用 | 直接复用ToolCallOutput.arguments |
 
 ---
 
