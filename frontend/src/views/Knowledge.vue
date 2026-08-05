@@ -4,8 +4,9 @@
 import { ref, onMounted, watch } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
-import { getDocuments, uploadDocument, deleteDocument, searchKnowledge } from '../api/knowledge'
+import { getDocuments, getGlobalDocuments, uploadDocument, uploadGlobalDocument, deleteDocument, searchKnowledge } from '../api/knowledge'
 import { ElMessage } from 'element-plus'
+import api from '../api'
 
 const projectStore = useProjectStore()
 const projectId = ref(projectStore.currentProjectId)
@@ -14,16 +15,33 @@ const documents = ref<any[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
 const searchResults = ref<any[]>([])
+const projects = ref<any[]>([])
+
+// 上传目标选择：global 或 具体项目ID
+const uploadTarget = ref<'global' | 'project'>('project')
+const selectedProjectId = ref(projectStore.currentProjectId)
 
 onMounted(async () => {
   await loadDocuments()
+  await loadProjects()
 })
+
+// 加载项目列表（供上传选择）
+const loadProjects = async () => {
+  try {
+    const res = await api.get('/projects')
+    projects.value = res.data.items || []
+  } catch (error) {
+    console.error('加载项目列表失败', error)
+  }
+}
 
 // 监听项目切换，自动刷新数据
 watch(
   () => projectStore.currentProjectId,
   () => {
     projectId.value = projectStore.currentProjectId
+    selectedProjectId.value = projectStore.currentProjectId
     loadDocuments()
   }
 )
@@ -31,13 +49,24 @@ watch(
 const loadDocuments = async () => {
   loading.value = true
   try {
-    const response = await getDocuments(projectId.value)
-    documents.value = response.data
+    if (uploadTarget.value === 'global') {
+      const response = await getGlobalDocuments()
+      documents.value = response.data
+    } else {
+      const response = await getDocuments(projectId.value || selectedProjectId.value)
+      documents.value = response.data
+    }
   } catch (error) {
     console.error('加载文档失败', error)
   } finally {
     loading.value = false
   }
+}
+
+// 切换上传目标（全局/项目）
+const switchTarget = (target: 'global' | 'project') => {
+  uploadTarget.value = target
+  loadDocuments()
 }
 
 // 当前项目名（用于显示关联项目）
@@ -51,11 +80,21 @@ watch(
   }
 )
 
-// 上传成功提示（标明关联项目）
+// 上传（根据选择目标）
 const handleUpload = async (file: File) => {
   try {
-    await uploadDocument(projectId.value, file)
-    ElMessage.success(`✅ 文档「${file.name}」已上传到项目：${projectName.value || projectId.value}`)
+    if (uploadTarget.value === 'global') {
+      await uploadGlobalDocument(file)
+      ElMessage.success(`✅ 文档「${file.name}」已上传到全局知识库`)
+    } else {
+      const pid = projectId.value || selectedProjectId.value
+      if (!pid) {
+        ElMessage.warning('请选择要关联的项目')
+        return
+      }
+      await uploadDocument(pid, file)
+      ElMessage.success(`✅ 文档「${file.name}」已上传到项目：${projectName.value || '当前项目'}`)
+    }
     await loadDocuments()
   } catch (error) {
     ElMessage.error('上传失败')
@@ -64,7 +103,8 @@ const handleUpload = async (file: File) => {
 
 const handleDelete = async (docId: string) => {
   try {
-    await deleteDocument(projectId.value, docId)
+    const pid = uploadTarget.value === 'global' ? '' : (projectId.value || selectedProjectId.value)
+    await deleteDocument(pid, docId)
     ElMessage.success('删除成功')
     await loadDocuments()
   } catch (error) {
@@ -75,7 +115,8 @@ const handleDelete = async (docId: string) => {
 const handleSearch = async () => {
   if (!searchQuery.value.trim()) return
   try {
-    const response = await searchKnowledge(projectId.value, searchQuery.value)
+    const pid = uploadTarget.value === 'global' ? '' : (projectId.value || selectedProjectId.value)
+    const response = await searchKnowledge(pid, searchQuery.value)
     searchResults.value = response.data.results
   } catch (error) {
     console.error('检索失败', error)
@@ -88,12 +129,38 @@ const handleSearch = async () => {
     <div class="knowledge-page">
       <div class="page-header">
         <h1>📚 知识库管理</h1>
-        <p v-if="projectName">当前关联项目：<strong>{{ projectName }}</strong></p>
-        <p v-else>上传文档，构建项目知识库（请先在左侧选择项目）</p>
+        <p>支持全局知识库与项目知识库，上传时选择归属</p>
       </div>
 
       <!-- 上传区域 -->
       <div class="upload-section">
+        <!-- 选择上传目标 -->
+        <div class="target-selector">
+          <button
+            class="target-btn"
+            :class="{ active: uploadTarget === 'global' }"
+            @click="switchTarget('global')"
+          >
+            🌐 全局知识库
+          </button>
+          <button
+            class="target-btn"
+            :class="{ active: uploadTarget === 'project' }"
+            @click="switchTarget('project')"
+          >
+            📁 项目知识库
+          </button>
+        </div>
+
+        <!-- 项目模式下选择关联项目 -->
+        <div v-if="uploadTarget === 'project'" class="project-picker">
+          <label>关联项目：</label>
+          <select v-model="selectedProjectId" @change="loadDocuments">
+            <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+          <span v-if="!projectId" class="pick-hint">（当前未选中项目，请选择）</span>
+        </div>
+
         <el-upload
           :before-upload="handleUpload"
           :show-file-list="false"
@@ -103,7 +170,7 @@ const handleSearch = async () => {
           <div class="upload-content">
             <span class="upload-icon">📤</span>
             <p>拖拽文件到这里，或点击上传</p>
-            <p class="upload-hint">支持 PDF、Word、Markdown、TXT</p>
+            <p class="upload-hint">上传到：{{ uploadTarget === 'global' ? '全局知识库' : '项目知识库' }}</p>
           </div>
         </el-upload>
       </div>
@@ -285,3 +352,50 @@ const handleSearch = async () => {
   padding: 40px;
 }
 </style>
+
+.target-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.target-btn {
+  flex: 1;
+  padding: 10px;
+  background: #171717;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #8e8ea0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.target-btn.active {
+  background: #667eea;
+  color: #fff;
+  border-color: #667eea;
+}
+
+.project-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.project-picker select {
+  background: #40414f;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+.pick-hint {
+  color: #ef4444;
+  font-size: 12px;
+}

@@ -8,7 +8,7 @@ from datetime import datetime
 # 知识文档响应
 class KnowledgeDocumentResponse(BaseModel):
     id: str
-    project_id: str
+    project_id: Optional[str]  # 全局文档为 None
     filename: str
     file_type: str
     file_size: Optional[int]

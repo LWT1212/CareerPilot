@@ -4,7 +4,7 @@ from app.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.projects import router as projects_router
 from app.api.v1.chats import router as chats_router, project_router, message_router
-from app.api.v1.knowledge import router as knowledge_router
+from app.api.v1.knowledge import router as knowledge_router, global_router
 from app.api.v1.experiences import router as experiences_router
 from app.api.v1.interviews import router as interviews_router, question_router
 from app.api.v1.documents import router as documents_router
@@ -31,6 +31,7 @@ app.include_router(chats_router, prefix="/api/v1")
 app.include_router(project_router, prefix="/api/v1")
 app.include_router(message_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
+app.include_router(global_router, prefix="/api/v1")
 app.include_router(experiences_router, prefix="/api/v1")
 app.include_router(interviews_router, prefix="/api/v1")
 app.include_router(question_router, prefix="/api/v1")

@@ -4,7 +4,7 @@
 import { ref, onMounted, watch } from 'vue'
 import Layout from '../components/Layout.vue'
 import { useProjectStore } from '../stores/project'
-import { getInterviews, createInterview, deleteInterview, getInterviewStats } from '../api/interview'
+import { getInterviews, getInterview, createInterview, deleteInterview, getInterviewStats, addQuestion } from '../api/interview'
 import { ElMessage } from 'element-plus'
 
 const projectStore = useProjectStore()
@@ -15,6 +15,57 @@ const stats = ref<any>(null)
 const loading = ref(false)
 const showCreateDialog = ref(false)
 const newInterview = ref({ company: '', position: '', interview_date: '', result: '', overall_feedback: '' })
+
+// 面试问题相关状态
+const expandedInterview = ref<string>('')        // 当前展开的面试ID
+const interviewDetail = ref<any>(null)           // 面试详情（含问题）
+const showQuestionDialog = ref(false)            // 添加问题弹窗
+const currentInterviewId = ref('')               // 当前添加问题的面试
+const newQuestion = ref({
+  question: '',
+  user_answer: '',
+  category: '',
+  difficulty: 'medium',
+  rating: 3,
+  interviewer_feedback: '',
+})
+
+// 展开/收起面试，加载问题列表
+const toggleExpand = async (interviewId: string) => {
+  if (expandedInterview.value === interviewId) {
+    expandedInterview.value = ''
+    return
+  }
+  expandedInterview.value = interviewId
+  try {
+    const res = await getInterview(projectId.value, interviewId)
+    interviewDetail.value = res.data
+  } catch (error) {
+    console.error('加载面试详情失败', error)
+  }
+}
+
+// 打开添加问题弹窗
+const openQuestionDialog = (interviewId: string) => {
+  currentInterviewId.value = interviewId
+  newQuestion.value = { question: '', user_answer: '', category: '', difficulty: 'medium', rating: 3, interviewer_feedback: '' }
+  showQuestionDialog.value = true
+}
+
+// 添加问题（触发AI薄弱点分析）
+const handleAddQuestion = async () => {
+  try {
+    await addQuestion(currentInterviewId.value, newQuestion.value)
+    ElMessage.success('问题已添加，AI正在分析薄弱点...')
+    showQuestionDialog.value = false
+    // 刷新详情和统计
+    const res = await getInterview(projectId.value, currentInterviewId.value)
+    interviewDetail.value = res.data
+    await loadStats()
+  } catch (error) {
+    ElMessage.error('添加失败')
+  }
+}
 
 onMounted(async () => {
   await loadInterviews()
@@ -113,13 +164,40 @@ const handleDelete = async (id: string) => {
               <h3>{{ item.company }}</h3>
               <p>{{ item.position }}</p>
             </div>
-            <button class="delete-btn" @click="handleDelete(item.id)">×</button>
+            <div class="item-actions">
+              <button class="expand-btn" @click="toggleExpand(item.id)">
+                {{ expandedInterview === item.id ? '收起 ▲' : '查看问题 ▼' }}
+              </button>
+              <button class="add-q-btn" @click="openQuestionDialog(item.id)">+ 添加问题</button>
+              <button class="delete-btn" @click="handleDelete(item.id)">×</button>
+            </div>
           </div>
           <div class="item-meta">
             <span v-if="item.interview_date">📅 {{ item.interview_date }}</span>
             <span v-if="item.result" class="result-badge" :class="item.result">{{ item.result }}</span>
           </div>
           <p v-if="item.overall_feedback" class="feedback">{{ item.overall_feedback }}</p>
+
+          <!-- 展开的问题列表 -->
+          <div v-if="expandedInterview === item.id" class="question-list">
+            <div v-if="!interviewDetail || interviewDetail.questions.length === 0" class="question-empty">
+              暂无问题，点击"+ 添加问题"记录面试题
+            </div>
+            <div v-for="q in interviewDetail?.questions || []" :key="q.id" class="question-item">
+              <div class="q-header">
+                <span class="q-category">{{ q.category || '未分类' }}</span>
+                <span class="q-difficulty">{{ q.difficulty }}</span>
+                <span class="q-rating" :class="q.rating <= 2 ? 'weak' : ''">评分 {{ q.rating }}/5</span>
+              </div>
+              <div class="q-text">{{ q.question }}</div>
+              <div v-if="q.user_answer" class="q-answer">
+                <strong>我的回答：</strong>{{ q.user_answer }}
+              </div>
+              <div v-if="q.interviewer_feedback" class="q-feedback">
+                <strong>面试官反馈：</strong>{{ q.interviewer_feedback }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -151,6 +229,37 @@ const handleDelete = async (id: string) => {
           <div class="dialog-actions">
             <button class="cancel-btn" @click="showCreateDialog = false">取消</button>
             <button class="confirm-btn" @click="handleCreate">创建</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 添加问题弹窗 -->
+      <div v-if="showQuestionDialog" class="dialog-overlay" @click.self="showQuestionDialog = false">
+        <div class="dialog">
+          <h2>添加面试问题</h2>
+          <textarea v-model="newQuestion.question" placeholder="面试问题" rows="2"></textarea>
+          <textarea v-model="newQuestion.user_answer" placeholder="我的回答（可选）" rows="2"></textarea>
+          <input v-model="newQuestion.category" placeholder="分类（如 Redis、系统设计）" />
+          <select v-model="newQuestion.difficulty">
+            <option value="easy">简单</option>
+            <option value="medium">中等</option>
+            <option value="hard">困难</option>
+          </select>
+          <div class="rating-row">
+            <label>回答评分：</label>
+            <select v-model="newQuestion.rating">
+              <option :value="1">1 - 很差</option>
+              <option :value="2">2 - 较弱</option>
+              <option :value="3">3 - 一般</option>
+              <option :value="4">4 - 良好</option>
+              <option :value="5">5 - 优秀</option>
+            </select>
+            <span class="rating-hint">评分≤2会被AI识别为薄弱点</span>
+          </div>
+          <textarea v-model="newQuestion.interviewer_feedback" placeholder="面试官反馈（可选）" rows="2"></textarea>
+          <div class="dialog-actions">
+            <button class="cancel-btn" @click="showQuestionDialog = false">取消</button>
+            <button class="confirm-btn" @click="handleAddQuestion">添加</button>
           </div>
         </div>
       </div>
@@ -341,3 +450,99 @@ const handleDelete = async (id: string) => {
 
 .empty { text-align: center; color: #8e8ea0; padding: 60px; }
 </style>
+
+.item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.expand-btn, .add-q-btn {
+  background: #2a2a2a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.add-q-btn {
+  background: #667eea;
+}
+
+.question-list {
+  margin-top: 15px;
+  border-top: 1px solid #2a2a2a;
+  padding-top: 10px;
+}
+
+.question-empty {
+  color: #8e8ea0;
+  font-size: 13px;
+  padding: 10px 0;
+}
+
+.question-item {
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.q-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.q-category {
+  background: #343541;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #8e8ea0;
+}
+
+.q-difficulty {
+  font-size: 12px;
+  color: #8e8ea0;
+}
+
+.q-rating {
+  font-size: 12px;
+  color: #10b981;
+}
+
+.q-rating.weak {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.q-text {
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.q-answer, .q-feedback {
+  font-size: 13px;
+  color: #ccc;
+  margin-top: 4px;
+}
+
+.rating-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.rating-row label {
+  color: #ccc;
+}
+
+.rating-hint {
+  font-size: 11px;
+  color: #ef4444;
+}

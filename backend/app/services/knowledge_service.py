@@ -14,8 +14,8 @@ from app.services.rag_service import (
 )
 
 
-# 上传文档
-def upload_document(db: Session, project_id: str, filename: str, file_content: bytes, file_type: str):
+# 上传文档（project_id 为空 = 全局知识库）
+def upload_document(db: Session, project_id, filename: str, file_content: bytes, file_type: str):
     # 生成唯一文件名
     file_id = str(uuid.uuid4())
     file_ext = os.path.splitext(filename)[1]
@@ -28,7 +28,7 @@ def upload_document(db: Session, project_id: str, filename: str, file_content: b
 
     # 创建数据库记录
     new_doc = KnowledgeDocument(
-        project_id=project_id,
+        project_id=project_id,  # 可为空（全局）
         filename=filename,
         file_type=file_type,
         file_path=file_path,
@@ -40,8 +40,10 @@ def upload_document(db: Session, project_id: str, filename: str, file_content: b
     db.refresh(new_doc)
 
     # 索引文档：解析 → 分块 → 嵌入 → 存入ChromaDB
+    # 全局文档用 "global" 作为集合名
+    collection_key = project_id or "global"
     try:
-        chunk_count = index_document(project_id, new_doc.id, file_path, file_type)
+        chunk_count = index_document(collection_key, new_doc.id, file_path, file_type)
         new_doc.embedding_status = "completed"
         new_doc.embedding_count = chunk_count
         # 保存解析后的纯文本
@@ -56,31 +58,31 @@ def upload_document(db: Session, project_id: str, filename: str, file_content: b
     return new_doc
 
 
-# 获取文档列表
-def get_documents(db: Session, project_id: str, skip: int = 0, limit: int = 20):
-    docs = db.query(KnowledgeDocument).filter(
-        KnowledgeDocument.project_id == project_id
-    ).offset(skip).limit(limit).all()
-    total = db.query(KnowledgeDocument).filter(
-        KnowledgeDocument.project_id == project_id
-    ).count()
+# 获取文档列表（project_id 为空 = 全局文档）
+def get_documents(db: Session, project_id, skip: int = 0, limit: int = 20):
+    if project_id:
+        query = db.query(KnowledgeDocument).filter(KnowledgeDocument.project_id == project_id)
+    else:
+        query = db.query(KnowledgeDocument).filter(KnowledgeDocument.project_id.is_(None))
+    docs = query.offset(skip).limit(limit).all()
+    total = query.count()
     return docs, total
 
 
-# 获取单个文档
-def get_document(db: Session, doc_id: str, project_id: str):
-    return db.query(KnowledgeDocument).filter(
-        KnowledgeDocument.id == doc_id,
-        KnowledgeDocument.project_id == project_id
-    ).first()
+# 获取单个文档（全局文档也可访问）
+def get_document(db: Session, doc_id: str, project_id=None):
+    query = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id)
+    if project_id:
+        query = query.filter(KnowledgeDocument.project_id == project_id)
+    return query.first()
 
 
 # 删除文档（同时删除向量）
-def delete_document(db: Session, doc_id: str, project_id: str):
-    doc = db.query(KnowledgeDocument).filter(
-        KnowledgeDocument.id == doc_id,
-        KnowledgeDocument.project_id == project_id
-    ).first()
+def delete_document(db: Session, doc_id: str, project_id=None):
+    query = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id)
+    if project_id:
+        query = query.filter(KnowledgeDocument.project_id == project_id)
+    doc = query.first()
     if not doc:
         return False
 
@@ -89,16 +91,18 @@ def delete_document(db: Session, doc_id: str, project_id: str):
         os.remove(doc.file_path)
 
     # 删除ChromaDB中的向量
-    delete_document_vectors(project_id, doc_id)
+    collection_key = doc.project_id or "global"
+    delete_document_vectors(collection_key, doc_id)
 
     db.delete(doc)
     db.commit()
     return True
 
 
-# 知识检索（语义检索，基于ChromaDB）
-def search_knowledge(db: Session, project_id: str, query: str, top_k: int = 5):
-    results = search_documents(project_id, query, top_k)
+# 知识检索（语义检索，基于ChromaDB；全局检索用 "global" 集合）
+def search_knowledge(db: Session, project_id, query: str, top_k: int = 5):
+    collection_key = project_id or "global"
+    results = search_documents(collection_key, query, top_k)
 
     # 补充文档文件名信息
     output = []

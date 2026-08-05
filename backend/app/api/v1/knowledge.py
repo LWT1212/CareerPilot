@@ -16,15 +16,39 @@ from app.services.knowledge_service import (
     search_knowledge
 )
 
-# 创建路由
+# 创建路由（项目知识库 + 全局知识库）
 router = APIRouter(prefix="/projects/{project_id}/knowledge", tags=["知识库"])
+global_router = APIRouter(prefix="/knowledge", tags=["全局知识库"])
 
 
-# 上传文档
+# ============ 全局知识库 ============
+
+# 上传到全局知识库
+@global_router.post("", response_model=KnowledgeDocumentResponse)
+async def upload_global(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """上传到全局知识库（不属于任何项目）"""
+    file_content = file.file.read()
+    file_type = file.filename.split(".")[-1].lower()
+    if file_type not in ["pdf", "docx", "doc", "md", "txt"]:
+        raise HTTPException(status_code=400, detail="不支持的文件格式")
+    return upload_document(db, None, file.filename, file_content, file_type)
+
+
+# 获取全局知识库列表
+@global_router.get("", response_model=list[KnowledgeDocumentResponse])
+def list_global_documents(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
+    """获取全局知识库文档列表"""
+    docs, _ = get_documents(db, None, skip, limit)
+    return docs
+
+
+# ============ 项目知识库 ============
+
+# 上传文档到项目
 @router.post("", response_model=KnowledgeDocumentResponse)
 async def upload(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     """
-    上传知识文档
+    上传知识文档到项目
     支持格式：PDF, Word, Markdown, TXT
     """
     # 读取文件内容

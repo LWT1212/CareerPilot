@@ -12,6 +12,11 @@ export const getInterviews = (projectId: string) => {
   return api.get(`/projects/${projectId}/interviews`)
 }
 
+// 获取单个面试详情（含问题列表）
+export const getInterview = (projectId: string, interviewId: string) => {
+  return api.get(`/projects/${projectId}/interviews/${interviewId}`)
+}
+
 // 获取面试统计
 export const getInterviewStats = (projectId: string) => {
   return api.get(`/projects/${projectId}/interviews/stats`)

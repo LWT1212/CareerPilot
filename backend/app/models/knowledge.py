@@ -12,7 +12,8 @@ class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    # project_id 为空 = 全局知识库文档
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True)
     filename = Column(String(255), nullable=False)
     file_type = Column(String(50), nullable=False)  # pdf, docx, md, txt
     file_path = Column(String(500), nullable=False)
