@@ -53,3 +53,28 @@ class MemoryItem(BaseModel):
 class MemoriesExtractOutput(BaseModel):
     """从对话提取多条记忆"""
     memories: list[MemoryItem] = Field(default_factory=list, description="提取出的记忆列表")
+
+
+# ============ 主动成长输出 ============
+class LearningPlanItem(BaseModel):
+    """单条学习计划"""
+    category: str = Field(description="薄弱类别，如Redis")
+    title: str = Field(description="学习计划标题")
+    content: str = Field(description="学习计划内容（markdown，含学习步骤和建议）")
+
+
+class LearningPlanOutput(BaseModel):
+    """学习计划列表"""
+    plans: list[LearningPlanItem] = Field(default_factory=list)
+
+
+class DocUpdateCheckOutput(BaseModel):
+    """文档更新检查"""
+    should_update: bool = Field(description="是否需要更新文档")
+    reason: str = Field(default="", description="更新原因和建议")
+
+
+class KnowledgeImpactOutput(BaseModel):
+    """知识库影响分析"""
+    impact: bool = Field(description="是否影响已有方案")
+    reason: str = Field(default="", description="影响分析说明")

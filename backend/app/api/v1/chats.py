@@ -147,6 +147,12 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
             count = db.query(MsgModel).filter(MsgModel.chat_id == chat_id).count()
             if count % 5 == 0 and count >= 5:
                 await extract_memories_from_messages(db, chat_id, project_id)
+                # 主动成长：沉淀后检查文档是否需要更新
+                try:
+                    from app.services.proactive_service import check_document_updates
+                    await check_document_updates(db, project_id)
+                except Exception as e:
+                    print(f"文档更新检查失败: {e}")
         except Exception as e:
             print(f"记忆沉淀失败: {e}")
 

@@ -64,6 +64,18 @@ question_router = APIRouter(prefix="/interviews/{interview_id}/questions", tags=
 
 
 @question_router.post("", response_model=InterviewQuestionResponse)
-def create_question(interview_id: str, data: InterviewQuestionCreate, db: Session = Depends(get_db)):
-    """添加面试问题"""
-    return add_question(db, interview_id, data)
+async def create_question(interview_id: str, data: InterviewQuestionCreate, db: Session = Depends(get_db)):
+    """添加面试问题（自动检查薄弱点）"""
+    question = add_question(db, interview_id, data)
+
+    # 主动成长：检查薄弱点并生成学习计划（后台触发，不阻塞响应）
+    try:
+        from app.models.interview import Interview
+        from app.services.proactive_service import analyze_interview_weakness
+        interview = db.query(Interview).filter(Interview.id == interview_id).first()
+        if interview:
+            await analyze_interview_weakness(db, interview.project_id)
+    except Exception as e:
+        print(f"薄弱点分析失败: {e}")
+
+    return question

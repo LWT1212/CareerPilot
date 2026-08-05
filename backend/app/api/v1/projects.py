@@ -126,3 +126,83 @@ def get_memories(
         ],
         "summaries": [s.summary for s in summaries],
     }
+
+
+# ============ 主动成长API ============
+
+# 获取学习计划
+@router.get("/{project_id}/learning-plans")
+def get_plans(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取AI生成的学习计划（面试薄弱点）"""
+    from app.services.proactive_service import get_learning_plans
+
+    project = get_project(db, project_id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    plans = get_learning_plans(db, project_id)
+    return [
+        {
+            "id": p.id,
+            "category": p.category,
+            "title": p.title,
+            "content": p.content,
+            "weak_count": p.weak_count,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in plans
+    ]
+
+
+# 获取提醒
+@router.get("/{project_id}/notifications")
+def get_notifs(
+    project_id: str,
+    unread_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取AI主动提醒"""
+    from app.services.proactive_service import get_notifications
+
+    project = get_project(db, project_id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    notifs = get_notifications(db, project_id, unread_only)
+    return [
+        {
+            "id": n.id,
+            "ntype": n.ntype,
+            "title": n.title,
+            "content": n.content,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+        }
+        for n in notifs
+    ]
+
+
+# 标记提醒已读
+@router.post("/{project_id}/notifications/{notif_id}/read")
+def mark_read(
+    project_id: str,
+    notif_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """标记提醒已读"""
+    from app.services.proactive_service import mark_notification_read
+
+    project = get_project(db, project_id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    success = mark_notification_read(db, notif_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="提醒不存在")
+    return {"message": "已标记为已读"}

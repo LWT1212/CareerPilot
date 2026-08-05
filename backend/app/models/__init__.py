@@ -9,9 +9,12 @@ from app.models.document import Document
 from app.models.agent_execution import AgentExecution
 from app.models.project_memory import ProjectMemory
 from app.models.chat_summary import ChatSummary
+from app.models.learning_plan import LearningPlan
+from app.models.notification import Notification
 
 __all__ = [
     "User", "Project", "Chat", "Message", "KnowledgeDocument",
     "Experience", "Interview", "InterviewQuestion", "Document",
-    "AgentExecution", "ProjectMemory", "ChatSummary"
+    "AgentExecution", "ProjectMemory", "ChatSummary",
+    "LearningPlan", "Notification"
 ]

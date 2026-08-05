@@ -22,7 +22,7 @@ router = APIRouter(prefix="/projects/{project_id}/knowledge", tags=["知识库"]
 
 # 上传文档
 @router.post("", response_model=KnowledgeDocumentResponse)
-def upload(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     """
     上传知识文档
     支持格式：PDF, Word, Markdown, TXT
@@ -35,7 +35,19 @@ def upload(project_id: str, file: UploadFile = File(...), db: Session = Depends(
     if file_type not in ["pdf", "docx", "doc", "md", "txt"]:
         raise HTTPException(status_code=400, detail="不支持的文件格式")
 
-    return upload_document(db, project_id, file.filename, file_content, file_type)
+    doc = upload_document(db, project_id, file.filename, file_content, file_type)
+
+    # 主动成长：新文档影响分析（后台触发）
+    if doc.embedding_status == "completed":
+        try:
+            from app.services.proactive_service import analyze_knowledge_impact
+            content = doc.content or ""
+            if content:
+                await analyze_knowledge_impact(db, project_id, content)
+        except Exception as e:
+            print(f"知识库影响分析失败: {e}")
+
+    return doc
 
 
 # 获取文档列表
