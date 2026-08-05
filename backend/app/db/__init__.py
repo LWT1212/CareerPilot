@@ -1,3 +1,6 @@
+#初始化模型base，创建数据库表
+#初始化会话工厂，绑定引擎，获取数据库会话
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker

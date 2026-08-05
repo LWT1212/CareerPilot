@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from langgraph.graph import StateGraph, END
 
-from app.services.llm_service import chat_completion
+from app.services.llm_service import chat_completion, structured_completion
 from app.services.rag_service import build_rag_context
+from app.agents.agent_schemas import IntentOutput, ToolCallOutput, ExperienceExtractOutput
 from app.agents.agent_tools import (
     save_experience, get_recent_experiences,
     get_interview_stats, save_document, get_document,
@@ -78,16 +79,19 @@ TOOL_SELECT_PROMPT = """你是{agent_name}，负责处理用户的请求。
 
 
 async def coordinator_node(state: AgentState) -> AgentState:
-    """协调者：LLM识别用户意图"""
+    """协调者：结构化LLM识别用户意图"""
     start = time.time()
     try:
-        intent = await chat_completion([], state["message"], INTENT_PROMPT)
-        intent = intent.strip().lower()
-        for valid in ["knowledge", "experience", "interview", "document", "chat"]:
-            if valid in intent:
-                intent = valid
-                break
-        else:
+        # 结构化输出意图（Pydantic schema约束，比文本匹配稳定）
+        intent_result = await structured_completion(
+            IntentOutput,
+            state["message"],
+            "判断用户消息的意图：knowledge=技术知识/查资料, experience=记录查询经验, interview=面试分析, document=生成文档, chat=普通对话。project_related=是否涉及项目内数据。"
+        )
+        intent = intent_result.intent
+        confidence = intent_result.confidence
+        # 低置信度兜底
+        if confidence < 0.4:
             intent = "chat"
     except Exception as e:
         print(f"意图识别失败: {e}")
@@ -102,7 +106,7 @@ async def coordinator_node(state: AgentState) -> AgentState:
 
 async def _agent_with_tools(state: AgentState, agent_name: str,
                             tool_map: dict, base_prompt: str) -> AgentState:
-    """通用Agent执行器：判断是否调用工具 → 执行 → 生成回复"""
+    """通用Agent执行器：结构化判断工具 → 结构化提取参数 → 执行 → 回复"""
     start = time.time()
     message = state["message"]
     db = state.get("db")
@@ -114,32 +118,34 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
     tool_desc = "\n".join(f"- {name}: {desc}" for name, desc in available_tools.items())
 
     try:
-        # 2. 让LLM判断是否需要调用工具
-        decision = await chat_completion(
-            [], message, TOOL_SELECT_PROMPT.format(agent_name=agent_name, tool_descriptions=tool_desc)
+        # 2. 结构化判断是否调用工具（ToolCallOutput schema）
+        decision = await structured_completion(
+            ToolCallOutput,
+            message,
+            f"你是{agent_name}助手。判断用户请求是否需要调用工具。\n可用工具：\n{tool_desc}\n"
+            f"use_tool=true时指定tool和arguments（工具参数从用户消息中提取）。"
         )
-        decision = decision.strip()
 
-        if decision.startswith("TOOL:"):
-            # 3. 解析工具调用
-            tool_line = decision[5:].strip()
-            tool_name = tool_line.split("(")[0].strip()
-            tool_args = {}
-            if "(" in tool_line:
-                args_str = tool_line.split("(", 1)[1].rstrip(")")
-                for pair in args_str.split(","):
-                    if "=" in pair:
-                        k, v = pair.split("=", 1)
-                        tool_args[k.strip()] = v.strip().strip("'\"")
+        if decision.use_tool and decision.tool in tool_map and db is not None and project_id:
+            # 3. 使用结构化参数（ToolCallOutput.arguments 已由LLM提取）
+            tool_name = decision.tool
+            tool_args = dict(decision.arguments or {})
+
+            # 经验保存：把arguments里的字段映射到save_experience参数
+            if tool_name == "save_experience":
+                tool_args = {
+                    "title": tool_args.get("title") or tool_args.get("标题") or message[:30],
+                    "exp_type": tool_args.get("exp_type") or tool_args.get("type") or "note",
+                    "content": tool_args.get("content") or message,
+                    "solution": tool_args.get("solution"),
+                }
+
             tool_args["db"] = db
             tool_args["project_id"] = project_id
 
             # 4. 执行工具
-            if tool_name in tool_map and db is not None:
-                tool_result = tool_map[tool_name](**tool_args)
-                response = tool_result.get("message", str(tool_result))
-            else:
-                response = "（工具执行需要项目上下文，请先在左侧选择项目）"
+            tool_result = tool_map[tool_name](**tool_args)
+            response = tool_result.get("message", str(tool_result))
 
             _record_execution(db, f"{agent_name}(tool:{tool_name})",
                               {"message": message}, {"result": response},
@@ -147,9 +153,9 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
         else:
             # 5. 无工具调用 → 直接咨询回复
             system_prompt = base_prompt
-            # 项目上下文增强
+            # 项目上下文增强（按Agent类型注入不同数据）
             if db is not None and project_id:
-                ctx = _build_project_context(db, project_id, message)
+                ctx = _build_project_context(db, project_id, message, agent_name)
                 if ctx:
                     system_prompt += f"\n\n【项目当前数据】\n{ctx}"
 
@@ -169,30 +175,50 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
     return {"response": response}
 
 
-def _build_project_context(db: Session, project_id: str, message: str) -> str:
-    """构建项目上下文：经验+面试+知识库"""
+def _build_project_context(db: Session, project_id: str, message: str, agent_name: str = "") -> str:
+    """按Agent类型注入项目上下文：经验/面试/知识库"""
     parts = []
 
-    try:
-        exps = get_recent_experiences(db, project_id, limit=3)
-        if exps:
-            parts.append("最近经验:\n" + "\n".join(f"- {e['title']}({e['type']})" for e in exps))
-    except Exception:
-        pass
+    # 经验Agent：注入更多经验数据
+    if agent_name in ("experience", "chat", ""):
+        try:
+            exps = get_recent_experiences(db, project_id, limit=5)
+            if exps:
+                parts.append("项目最近经验:\n" + "\n".join(f"- {e['title']}({e['type']})" for e in exps))
+        except Exception:
+            pass
 
-    try:
-        stats = get_interview_stats(db, project_id)
-        if stats["weak_areas"]:
-            parts.append("面试薄弱点: " + ", ".join(f"{w['category']}" for w in stats["weak_areas"]))
-    except Exception:
-        pass
+    # 面试Agent：注入完整面试统计
+    if agent_name in ("interview", "chat", ""):
+        try:
+            stats = get_interview_stats(db, project_id)
+            if stats["total_interviews"] > 0:
+                parts.append(f"面试统计: 共{stats['total_interviews']}场/{stats['total_questions']}题")
+                if stats["weak_areas"]:
+                    parts.append("面试薄弱点: " + ", ".join(
+                        f"{w['category']}({w['weak_count']}次弱)" for w in stats["weak_areas"]
+                    ))
+        except Exception:
+            pass
 
-    try:
-        context = build_rag_context(project_id, message, top_k=2)
-        if context:
-            parts.append("知识库相关:\n" + context[:300])
-    except Exception:
-        pass
+    # 知识Agent：注入RAG检索
+    if agent_name in ("knowledge", "chat", ""):
+        try:
+            context = build_rag_context(project_id, message, top_k=3)
+            if context:
+                parts.append("知识库相关:\n" + context[:400])
+        except Exception:
+            pass
+
+    # 文档Agent：注入现有文档
+    if agent_name in ("document", "chat", ""):
+        try:
+            from app.models.document import Document
+            docs = db.query(Document).filter(Document.project_id == project_id).all()
+            if docs:
+                parts.append("项目现有文档: " + ", ".join(f"{d.doc_type}(v{d.version})" for d in docs))
+        except Exception:
+            pass
 
     return "\n\n".join(parts)
 

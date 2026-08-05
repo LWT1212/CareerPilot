@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "openai"  # openai 或 ollama
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4"
+    OPENAI_BASE_URL: str = ""  # 自定义OpenAI兼容端点（阿里云DashScope等）
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen"
 

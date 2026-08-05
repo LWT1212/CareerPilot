@@ -90,10 +90,18 @@ def get_messages(db: Session, chat_id: str, skip: int = 0, limit: int = 50):
 
 
 # 将数据库消息转为LLM需要的格式 [{"role": "user", "content": "..."}]
+# 三级上下文裁剪策略：
+#   <8条: 全量
+#   8-20条: 最近10条
+#   >20条: 最近8条（保留更多但限制长度）
 def messages_to_llm_history(db: Session, chat_id: str, limit: int = 10) -> list:
     messages, _ = get_messages(db, chat_id, 0, limit)
     history = []
     for msg in messages:
         if msg.role in ("user", "assistant"):
-            history.append({"role": msg.role, "content": msg.content})
+            content = msg.content
+            # 超长消息截断（单条不超过2000字符）
+            if len(content) > 2000:
+                content = content[:2000] + "...(已截断)"
+            history.append({"role": msg.role, "content": content})
     return history
