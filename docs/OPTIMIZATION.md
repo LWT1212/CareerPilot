@@ -263,16 +263,40 @@
 
 ## T16 O4: 主动成长能力
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 已完成 (2026-08-02)
 
 ### 优化目标
-_（待填写）_
+AI主动驱动成长（PRD核心）：薄弱点学习计划+文档更新提醒+知识库影响分析
 
 ### 详细步骤
-_（实施后填写）_
+
+**S1. 建表**
+1. `models/learning_plan.py`：LearningPlan（category, title, content, weak_count, status）
+2. `models/notification.py`：Notification（ntype: weakness/doc_update/knowledge_impact, is_read）
+
+**S2. 主动分析服务（proactive_service.py）**
+1. `analyze_interview_weakness()`：统计rating<=2的面试问题→同类>=2次为薄弱→LLM生成学习计划
+2. `check_document_updates()`：读决策/进度记忆→判断是否需要更新文档
+3. `analyze_knowledge_impact()`：分析新上传文档对已有方案的影响
+4. `get_learning_plans()/get_notifications()/mark_notification_read()` 查询API
+
+**S3. 3个触发点**
+1. 面试问题新增 → 薄弱点分析（interviews.py）
+2. 记忆沉淀后 → 文档更新检查（chats.py）
+3. 知识库上传 → 影响分析（knowledge.py）
+
+**S4. API**
+1. `GET /projects/{id}/learning-plans`
+2. `GET /projects/{id}/notifications`（支持unread_only）
+3. `POST /projects/{id}/notifications/{nid}/read`
 
 ### 遇到的问题
-_（实施后填写）_
+| 问题 | 解决 |
+|------|------|
+| 提醒重复创建 | 同项目同类别未读提醒去重 |
+
+### 验证
+- 3个Redis弱问题(rating=2) → 自动生成"Redis核心机制与高可用架构突破计划" + 薄弱提醒 ✅
 
 ---
 
