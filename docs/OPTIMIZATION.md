@@ -93,7 +93,7 @@
 ### 第三批：生态扩展（V2）
 | 任务 | 内容 |
 |------|------|
-| [ ] T17 O5 | MCP工具接入 + 内置工具集 |
+| [x] T17 O5 | MCP工具接入 + 内置工具集 |
 | [ ] T18 O6 | Skill系统 + Prompt模板库 |
 | [ ] T19 O7 | 工程优化（PostgreSQL/异步/测试） |
 
@@ -302,16 +302,42 @@ AI主动驱动成长（PRD核心）：薄弱点学习计划+文档更新提醒+�
 
 ## T17 O5: MCP工具接入 + 内置工具集
 
-**状态**: ⏳ 待开始
+**状态**: ✅ S1-S3完成（S4测试待补）(2026-08-06)
 
 ### 优化目标
-_（待填写）_
+让 Agent 通过 MCP（Model Context Protocol）调用外部工具：GitHub查询/网页搜索/文件读取
 
 ### 详细步骤
-_（实施后填写）_
+
+**S1. 安装 mcp 库**
+1. `pip install mcp`（装的是 2.0.0，API 与 1.x 不同）
+
+**S2. 创建 MCP 服务器（mcp_server.py）**
+1. 工具1 `github_repo_info`: GitHub公开API查询仓库（无需token）
+2. 工具2 `read_local_file`: 读取本地文件（前3000字符）
+3. 工具3 `web_search`: DuckDuckGo免费网页搜索（无需API key）
+4. mcp 2.0 API：`from mcp.server.mcpserver import MCPServer` + `@mcp.tool()`
+5. 启动：`mcp.run(transport="stdio")`（stdio协议，JSON-RPC通信）
+6. 验证：stdio初始化握手返回 serverInfo
+
+**S3. MCP客户端接入Agent（mcp_client_service.py）**
+1. `call_mcp_tool()`: 用 `stdio_client + ClientSession` 启动子进程调用工具
+2. 封装3个 async 工具函数（github_repo_info/web_search/read_local_file）
+3. agent_tools.py 注册到 TOOLS/TOOL_DESCRIPTIONS
+4. knowledge Agent 的 tool_map 集成 github_repo_info + web_search
+5. `_agent_with_tools` 支持 async 工具（`inspect.iscoroutine` + await）
 
 ### 遇到的问题
-_（实施后填写）_
+| 问题 | 解决 |
+|------|------|
+| mcp 2.0 无 mcp.server.fastmcp 模块 | 改用 `MCPServer`（新API） |
+| command="python" 找不到解释器 | 用 `sys.executable` |
+| asyncio.run() 不能在运行中的事件循环调用 | MCP工具改 async + Agent await 协程 |
+| 装 mcp 时 starlette 被升级到 1.4.1 | 降回 0.35.1（fastapi 0.109 兼容） |
+
+### 验证
+- MCP服务器stdio握手成功 ✅
+- Agent 问"查GitHub fastapi仓库" → 调用MCP工具 → 返回真实数据（10万+star） ✅
 
 ---
 
