@@ -4,6 +4,7 @@
 
 from typing import TypedDict
 import time
+import inspect
 from sqlalchemy.orm import Session
 
 from langgraph.graph import StateGraph, END
@@ -16,6 +17,7 @@ from app.agents.agent_tools import (
     get_interview_stats, save_document, get_document,
     search_project_knowledge, TOOL_DESCRIPTIONS,
 )
+from app.services.mcp_client_service import github_repo_info, web_search
 from app.models.agent_execution import AgentExecution
 
 
@@ -154,6 +156,9 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
 
             # 4. 执行工具（兼容dict和list返回）
             tool_result = tool_map[tool_name](**tool_args)
+            # 支持 async 工具（MCP工具是协程）
+            if inspect.iscoroutine(tool_result):
+                tool_result = await tool_result
             if isinstance(tool_result, dict):
                 response = tool_result.get("message", str(tool_result))
             elif isinstance(tool_result, list) and tool_result:
@@ -263,11 +268,16 @@ def _build_project_context(db: Session, project_id: str, message: str, agent_nam
 # ============ 具体Agent节点 ============
 
 async def knowledge_node(state: AgentState) -> AgentState:
-    """知识Agent：RAG检索 + 知识库工具"""
+    """知识Agent：RAG检索 + 知识库工具 + MCP外部工具（GitHub/Web搜索）"""
     return await _agent_with_tools(
         state, "knowledge",
-        {"search_project_knowledge": search_project_knowledge},
-        "你是CareerPilot的知识助手，基于项目知识库回答技术问题。"
+        {
+            "search_project_knowledge": search_project_knowledge,
+            "github_repo_info": github_repo_info,
+            "web_search": web_search,
+        },
+        "你是CareerPilot的知识助手。查项目知识库用search_project_knowledge，"
+        "查GitHub仓库用github_repo_info，查网上资料用web_search，纯咨询则直接回答。"
     )
 
 

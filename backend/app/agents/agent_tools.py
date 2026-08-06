@@ -144,3 +144,20 @@ TOOL_DESCRIPTIONS = {
     "get_document": "获取项目文档。参数: doc_type。当用户询问已有文档时调用。",
     "search_project_knowledge": "检索项目知识库。参数: query(查询词)。当用户询问技术知识时调用。",
 }
+
+
+# ============ MCP 外部工具（T17） ============
+from app.services.mcp_client_service import (
+    github_repo_info as mcp_github_repo_info,
+    web_search as mcp_web_search,
+    read_local_file as mcp_read_local_file,
+)
+
+# 注册到工具注册表（供Agent调用）
+TOOLS["github_repo_info"] = mcp_github_repo_info
+TOOLS["web_search"] = mcp_web_search
+TOOLS["read_local_file"] = mcp_read_local_file
+
+TOOL_DESCRIPTIONS["github_repo_info"] = "查询GitHub仓库信息。参数: repo(用户名/仓库名)。用户想了解某个开源项目/仓库时调用。"
+TOOL_DESCRIPTIONS["web_search"] = "网页搜索。参数: query(搜索关键词)。用户想查找网上资料/最新信息时调用。"
+TOOL_DESCRIPTIONS["read_local_file"] = "读取本地文件。参数: filepath(文件路径)。用户想查看项目代码文件时调用。"
