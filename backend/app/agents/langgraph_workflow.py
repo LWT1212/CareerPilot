@@ -158,6 +158,20 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
                     "solution": tool_args.get("solution"),
                 }
 
+            # 文档保存：content为空时先用LLM生成内容（修复空文档缺陷）
+            if tool_name == "save_document":
+                doc_type = tool_args.get("doc_type") or "readme"
+                content = tool_args.get("content") or ""
+                if not content or len(content.strip()) < 20:
+                    # 根据用户需求生成完整文档内容
+                    generated = await chat_completion(
+                        [], message,
+                        f"请根据用户需求生成{doc_type}文档内容（markdown格式），要专业、完整、结构清晰。"
+                        f"用户需求：{message}"
+                    )
+                    tool_args["content"] = generated
+                tool_args["doc_type"] = doc_type
+
             tool_args["db"] = db
             tool_args["project_id"] = project_id
 

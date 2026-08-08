@@ -111,7 +111,14 @@
 
 | # | 缺陷 | 严重度 | 状态 |
 |---|------|--------|------|
-| 1 | Document Agent 保存文档 content 为空 | 高 | 待修复 |
+| 1 | Document Agent 保存文档 content 为空 | 高 | ✅ 已修复 |
+
+### 缺陷1修复记录
+
+**修复**: langgraph_workflow.py `_agent_with_tools` 中 save_document 分支加 content 兜底：
+- content 为空或 <20字符时，先用 LLM 生成完整文档内容再保存
+
+**验证**: 生成README后 content=3844字符（修复前为0）✅
 
 ---
 
