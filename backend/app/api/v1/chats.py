@@ -122,19 +122,38 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
     chat = get_chat(db, chat_id)
     project_id = chat.project_id if chat else None
 
-    # 4. 调用LangGraph多智能体工作流（传入db让Agent能操作数据库）
-    try:
-        from app.agents.langgraph_workflow import run_agent
-        result = await run_agent(message_data.content, project_id or "", history, db)
-        ai_content = result.get("response", "")
-        agent_used = result.get("intent", "llm")
-        if not ai_content:
-            ai_content = "（未能生成回复）"
-    except Exception as e:
-        # LLM调用失败时返回友好提示
-        print(f"多智能体调用失败: {e}")
-        ai_content = "（AI服务暂时不可用，请检查LLM配置：OPENAI_API_KEY 或 Ollama服务）"
-        agent_used = "error"
+    # 4. 检查Skill触发（如"沉淀这个经验"）
+    from app.skills.skills_manager import skills_manager
+    skill = skills_manager.match(message_data.content)
+
+    if skill:
+        # 命中Skill → 执行Skill作为回复
+        try:
+            ai_content = await skills_manager.execute(skill.name, {
+                "message": message_data.content,
+                "project_id": project_id or "",
+                "db": db,
+                "chat_history": history,
+            })
+            agent_used = f"skill:{skill.name}"
+        except Exception as e:
+            print(f"Skill执行失败: {e}")
+            ai_content = "（技能执行失败，请重试）"
+            agent_used = "skill_error"
+    else:
+        # 未命中Skill → 走LangGraph多智能体
+        try:
+            from app.agents.langgraph_workflow import run_agent
+            result = await run_agent(message_data.content, project_id or "", history, db)
+            ai_content = result.get("response", "")
+            agent_used = result.get("intent", "llm")
+            if not ai_content:
+                ai_content = "（未能生成回复）"
+        except Exception as e:
+            # LLM调用失败时返回友好提示
+            print(f"多智能体调用失败: {e}")
+            ai_content = "（AI服务暂时不可用，请检查LLM配置：OPENAI_API_KEY 或 Ollama服务）"
+            agent_used = "error"
 
     # 5. 保存AI回复
     ai_message = ai_reply(db, chat_id, ai_content, agent_used)
@@ -153,6 +172,17 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
                     await check_document_updates(db, project_id)
                 except Exception as e:
                     print(f"文档更新检查失败: {e}")
+                # 自动沉淀经验Skill：把问题+答案存入experiences
+                try:
+                    from app.skills.skills_manager import skills_manager
+                    await skills_manager.execute("experience_curator", {
+                        "message": message_data.content,
+                        "project_id": project_id,
+                        "db": db,
+                        "chat_history": history,
+                    })
+                except Exception as e:
+                    print(f"经验沉淀失败: {e}")
         except Exception as e:
             print(f"记忆沉淀失败: {e}")
 
