@@ -58,11 +58,29 @@ def build_messages(history: list, user_message: str, system_prompt: str = "") ->
 
 async def chat_completion(history: list, user_message: str, system_prompt: str = "") -> str:
     """
-    一次性获取 LLM 回复（非流式）
+    一次性获取 LLM 回复（非流式，带Redis缓存）
+    相同请求命中缓存则直接返回，省token和时间
     """
+    from app.services.redis_service import get_llm_cache, set_llm_cache
+
+    # 生成缓存用的消息文本（含系统提示词，保证一致性）
+    cache_text = f"{system_prompt}|{user_message}"
+    for msg in history[-6:]:
+        cache_text += f"|{msg['role']}:{msg['content'][:100]}"
+
+    # 1. 查缓存
+    cached = get_llm_cache(settings.LLM_PROVIDER, settings.OPENAI_MODEL or settings.OLLAMA_MODEL, cache_text)
+    if cached:
+        return cached
+
+    # 2. 未命中 → 调LLM
     llm = get_llm()
     messages = build_messages(history, user_message, system_prompt)
     response = await llm.ainvoke(messages)
+
+    # 3. 写缓存
+    set_llm_cache(settings.LLM_PROVIDER, settings.OPENAI_MODEL or settings.OLLAMA_MODEL, cache_text, response.content)
+
     return response.content
 
 
@@ -102,6 +120,16 @@ async def structured_completion(schema_model, user_message: str,
     llm = get_llm()
     messages = build_messages([], prompt, "")
 
+    # 结构化输出缓存（相同请求直接返回）
+    from app.services.redis_service import get_llm_cache, set_llm_cache
+    cache_key_text = f"struct|{schema_model.__name__}|{prompt}"
+    cached = get_llm_cache(settings.LLM_PROVIDER, settings.OPENAI_MODEL or settings.OLLAMA_MODEL, cache_key_text)
+    if cached:
+        try:
+            return schema_model(**json.loads(cached))
+        except Exception:
+            pass  # 缓存解析失败则重新生成
+
     for attempt in range(max_retries):
         try:
             response = await llm.ainvoke(messages)
@@ -115,6 +143,8 @@ async def structured_completion(schema_model, user_message: str,
                 text = text.strip()
 
             data = json.loads(text)
+            # 写缓存
+            set_llm_cache(settings.LLM_PROVIDER, settings.OPENAI_MODEL or settings.OLLAMA_MODEL, cache_key_text, text)
             return schema_model(**data)
         except (json.JSONDecodeError, ValidationError) as e:
             if attempt == max_retries - 1:

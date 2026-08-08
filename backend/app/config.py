@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # CORS配置（允许前端访问）
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
+    # Redis 配置（LLM响应缓存）
+    REDIS_URL: str = "redis://localhost:6379/0"
+    LLM_CACHE_TTL: int = 3600  # 缓存有效期（秒），默认1小时
+
     # 文件上传配置
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
