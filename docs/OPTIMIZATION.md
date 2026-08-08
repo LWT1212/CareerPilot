@@ -383,13 +383,35 @@ AI主动驱动成长（PRD核心）：薄弱点学习计划+文档更新提醒+�
 
 ## T19 O7: 工程优化
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 异步任务队列完成（PostgreSQL迁移暂缓）(2026-08-06)
 
 ### 优化目标
-_（待填写）_
+1. 异步任务队列：文档上传/索引不阻塞接口（已完成）
+2. PostgreSQL迁移：暂缓（用户决定数据库先不变）
+3. 测试补充/Token统计：待后续
 
-### 详细步骤
-_（实施后填写）_
+### 详细步骤（异步化）
+
+**1. knowledge_service.py 拆分**
+1. `upload_document`：只保存文件+建记录（embedding_status=processing），立即返回
+2. `process_document(doc_id, project_id)`：后台索引（解析→分块→嵌入→存ChromaDB）
+   - 关键：必须新建 SessionLocal 会话（请求的session后台时已关闭）
+
+**2. rag_service.py**
+- embed_texts 保持同步requests（由后台线程执行，不阻塞事件循环）
+
+**3. knowledge.py 接口**
+1. upload 接口加 `BackgroundTasks` 参数
+2. `background_tasks.add_task(process_document, doc.id, project_id)` 注册后台任务
+3. 全局上传同样异步
+4. 知识库影响分析也放后台（等索引完成后再分析）
 
 ### 遇到的问题
-_（实施后填写）_
+| 问题 | 解决 |
+|------|------|
+| 后台任务不能复用请求的db session | process_document 内部新建 SessionLocal |
+| embed用asyncio.run会阻塞/报错 | 保持同步requests，放后台线程执行 |
+
+### 验证
+- 上传接口0秒返回（原来等待索引）✅
+- 3秒后后台自动完成索引（processing→completed）✅
