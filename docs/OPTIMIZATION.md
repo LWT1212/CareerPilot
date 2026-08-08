@@ -424,3 +424,47 @@ AI主动驱动成长（PRD核心）：薄弱点学习计划+文档更新提醒+�
 - 3秒后后台自动完成索引（processing→completed）✅
 - 知识检索0秒返回（embedding异步不阻塞）✅
 - 聊天多智能体+RAG链路正常 ✅
+
+---
+
+## T20: Redis 缓存接入（2026-08-06）
+
+**状态**: ✅ 已完成
+
+### 优化目标
+LLM响应缓存：相同问题命中缓存，省token和时间（评测层面8/性能）
+
+### 详细步骤
+
+**S1. 安装**
+1. `pip install redis`（系统已装 redis-server 7.0.15）
+
+**S2. 配置（config.py）**
+1. `REDIS_URL: str = "redis://localhost:6379/0"`
+2. `LLM_CACHE_TTL: int = 3600`（缓存1小时）
+
+**S3. 缓存服务（redis_service.py）**
+1. Redis连接 `redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)`
+2. `_make_key(prefix, content)`：前缀+内容MD5 hash
+3. `get_llm_cache/set_llm_cache`：LLM响应缓存（key含provider+model）
+4. `get_cache/set_cache`：通用缓存
+5. `ping()`：连接测试
+6. 所有操作 try-except（Redis挂了不影响主流程）
+
+**S4. llm_service 接入缓存**
+1. `chat_completion`：
+   - 缓存key文本 = system_prompt + 用户消息 + 最近6条历史
+   - 命中→直接返回；未命中→调LLM→写缓存
+2. `structured_completion`：
+   - 缓存key含 schema名+prompt
+   - 命中→反序列化返回
+
+### 遇到的问题
+| 问题 | 解决 |
+|------|------|
+| Redis挂了会导致LLM不可用 | 所有redis操作try-except降级 |
+
+### 验证
+- Redis连接 ping ✅
+- 相同问题：第1次 8.2s（调LLM）→ 第2次 0.00s（命中缓存）✅
+- 回答一致性验证 ✅
