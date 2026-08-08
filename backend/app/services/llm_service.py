@@ -56,6 +56,22 @@ def build_messages(history: list, user_message: str, system_prompt: str = "") ->
     return messages
 
 
+def extract_usage(response) -> dict:
+    """
+    从LLM响应提取token用量
+    返回: {"prompt_tokens": x, "completion_tokens": y, "total_tokens": z}
+    缓存命中时无法获取（返回0）
+    """
+    usage = getattr(response, "usage_metadata", None) or {}
+    if usage:
+        return {
+            "prompt_tokens": usage.get("input_tokens", 0),
+            "completion_tokens": usage.get("output_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        }
+    return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+
 async def chat_completion(history: list, user_message: str, system_prompt: str = "") -> str:
     """
     一次性获取 LLM 回复（非流式，带Redis缓存）
@@ -78,10 +94,23 @@ async def chat_completion(history: list, user_message: str, system_prompt: str =
     messages = build_messages(history, user_message, system_prompt)
     response = await llm.ainvoke(messages)
 
-    # 3. 写缓存
+    # 3. 记录最近一次usage（供评测取token量）
+    global _last_usage
+    _last_usage = extract_usage(response)
+
+    # 4. 写缓存
     set_llm_cache(settings.LLM_PROVIDER, settings.OPENAI_MODEL or settings.OLLAMA_MODEL, cache_text, response.content)
 
     return response.content
+
+
+# 最近一次LLM调用的usage（评测用）
+_last_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+
+def get_last_usage() -> dict:
+    """获取最近一次LLM调用的token用量"""
+    return _last_usage
 
 
 async def stream_completion(history: list, user_message: str, system_prompt: str = "") -> AsyncGenerator[str, None]:

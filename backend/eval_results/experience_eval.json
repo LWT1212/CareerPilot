@@ -1,0 +1,31 @@
+{
+  "correct": 5,
+  "total": 5,
+  "results": [
+    {
+      "case": "N3-01 保存经验",
+      "ok": true,
+      "detail": "agent=skill:experience_curator, ✅ 经验「MySQL连接池耗尽导致连接超时」已保存"
+    },
+    {
+      "case": "N3-01b DB写入+参数完整",
+      "ok": true,
+      "detail": "type字段=['bug', 'solution']"
+    },
+    {
+      "case": "N3-02 查询经验",
+      "ok": true,
+      "detail": "查询到 1 条记录：\n{'title': 'MySQL连接池耗尽导致连接超时', 'type': 'bug', 'con"
+    },
+    {
+      "case": "N3-05 无项目上下文",
+      "ok": true,
+      "detail": "沉淀经验需要项目上下文，请先在左侧选择一个项目"
+    },
+    {
+      "case": "N3-06 无类型输入",
+      "ok": true,
+      "detail": "✅ 经验「接口返回500无详细信息：MySQL连接池耗尽导致超时」已保存"
+    }
+  ]
+}

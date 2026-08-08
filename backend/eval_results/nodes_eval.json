@@ -1,0 +1,46 @@
+{
+  "correct": 7,
+  "total": 8,
+  "results": [
+    {
+      "case": "N4-01 薄弱点识别",
+      "ok": true,
+      "detail": "{'total_interviews': 1, 'total_questions': 3, 'by_company': [{'company': '字节跳动',"
+    },
+    {
+      "case": "N4-02 学习计划生成",
+      "ok": true,
+      "detail": "1个计划"
+    },
+    {
+      "case": "N4-04 无面试数据",
+      "ok": true,
+      "detail": "{'total_interviews': 0, 'total_questions': 0, 'by_company': "
+    },
+    {
+      "case": "N5-01 生成文档",
+      "ok": true,
+      "detail": "文档 readme 已保存 v1"
+    },
+    {
+      "case": "N5-01b 文档写入",
+      "ok": true,
+      "detail": "1个文档"
+    },
+    {
+      "case": "N5-03 查询文档",
+      "ok": "",
+      "detail": ""
+    },
+    {
+      "case": "N2-01 RAG命中",
+      "ok": true,
+      "detail": "查询到 1 条记录：\n{'content': 'Redis支持RDB快照和AOF日志两种持久化机制。RDB在指定时间间隔保存快照，AOF记录每次写操作。', '"
+    },
+    {
+      "case": "N2-06 GitHub工具",
+      "ok": true,
+      "detail": "{\n  \"name\": \"fastapi/fastapi\",\n  \"description\": \"FastAPI framework, high perform"
+    }
+  ]
+}

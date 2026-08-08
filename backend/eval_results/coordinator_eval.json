@@ -1,0 +1,232 @@
+{
+  "accuracy": 96.0,
+  "total": 25,
+  "correct": 24,
+  "results": [
+    {
+      "input": "帮我分析最近面试失败原因",
+      "expected": "interview",
+      "actual": "interview",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 5.49
+    },
+    {
+      "input": "Redis持久化机制有哪些",
+      "expected": "knowledge",
+      "actual": "knowledge",
+      "confidence": 1.0,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 4.81
+    },
+    {
+      "input": "记录经验：Docker权限不足",
+      "expected": "experience",
+      "actual": "experience",
+      "confidence": 1.0,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 5.33
+    },
+    {
+      "input": "帮我生成项目README",
+      "expected": "document",
+      "actual": "document",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 4.92
+    },
+    {
+      "input": "你好，今天天气怎么样",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 1.0,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 3.99
+    },
+    {
+      "input": "查一下项目里关于部署的资料",
+      "expected": "knowledge",
+      "actual": "knowledge",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 5.44
+    },
+    {
+      "input": "面试的薄弱点是什么",
+      "expected": "interview",
+      "actual": "interview",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 5.7
+    },
+    {
+      "input": "更新一下我的简历",
+      "expected": "document",
+      "actual": "document",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 5.56
+    },
+    {
+      "input": "我们踩过哪些坑",
+      "expected": "experience",
+      "actual": "experience",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 4.93
+    },
+    {
+      "input": "谢谢",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 0.99,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 4.03
+    },
+    {
+      "input": "如何用docker部署FastAPI",
+      "expected": "knowledge",
+      "actual": "knowledge",
+      "confidence": 1.0,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 5.15
+    },
+    {
+      "input": "总结一下这个月的开发进度",
+      "expected": "experience",
+      "actual": "document",
+      "confidence": 0.9,
+      "ok": false,
+      "type": "正向",
+      "elapsed_s": 10.44
+    },
+    {
+      "input": "帮我准备一下系统设计面试",
+      "expected": "interview",
+      "actual": "interview",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 4.01
+    },
+    {
+      "input": "写一个PRD文档",
+      "expected": "document",
+      "actual": "document",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 4.15
+    },
+    {
+      "input": "聊聊最近的技术趋势",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 0.85,
+      "ok": true,
+      "type": "正向",
+      "elapsed_s": 9.77
+    },
+    {
+      "input": "",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 0.5,
+      "ok": true,
+      "type": "反向-空输入",
+      "elapsed_s": 4.75
+    },
+    {
+      "input": "!!!",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 0.3,
+      "ok": true,
+      "type": "反向-符号",
+      "elapsed_s": 5.88
+    },
+    {
+      "input": "帮我分析面试中Redis答得不好",
+      "expected": "interview",
+      "actual": "interview",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "反向-混合意图",
+      "elapsed_s": 4.93
+    },
+    {
+      "input": "生成README顺便记录个bug",
+      "expected": "document",
+      "actual": "document",
+      "confidence": 0.9,
+      "ok": true,
+      "type": "反向-多意图",
+      "elapsed_s": 5.92
+    },
+    {
+      "input": "asdfghjklqwertyuiop",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 0.6,
+      "ok": true,
+      "type": "反向-乱码",
+      "elapsed_s": 5.83
+    },
+    {
+      "input": "好",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "边界-单字",
+      "elapsed_s": 5.3
+    },
+    {
+      "input": "What is Redis and how it works",
+      "expected": "knowledge",
+      "actual": "knowledge",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "边界-英文",
+      "elapsed_s": 5.46
+    },
+    {
+      "input": "def foo(): return 42",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 0.9,
+      "ok": true,
+      "type": "边界-代码",
+      "elapsed_s": 9.03
+    },
+    {
+      "input": "👍",
+      "expected": "chat",
+      "actual": "chat",
+      "confidence": 1.0,
+      "ok": true,
+      "type": "边界-表情",
+      "elapsed_s": 4.39
+    },
+    {
+      "input": "详细解释一下分布式系统中的一致性协议包括Raft和Paxos以及ZAB的具体实现",
+      "expected": "knowledge",
+      "actual": "knowledge",
+      "confidence": 0.95,
+      "ok": true,
+      "type": "边界-超长",
+      "elapsed_s": 5.12
+    }
+  ]
+}

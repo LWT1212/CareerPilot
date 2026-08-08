@@ -108,6 +108,7 @@ def get_executions(limit: int = 20, db: Session = Depends(get_db)):
             "status": e.status,
             "created_at": e.created_at.isoformat() if e.created_at else None,
             "output": e.output_data,
+            "tokens": (e.output_data or {}).get("tokens", {}),  # token用量
         }
         for e in executions
     ]

@@ -37,14 +37,21 @@ class AgentState(TypedDict):
 
 def _record_execution(db, agent_type: str, input_data: dict,
                       output_data: dict, duration_ms: int, status: str = "success"):
-    """记录Agent执行过程到数据库"""
+    """记录Agent执行过程到数据库（含token用量）"""
     if db is None:
         return
     try:
+        # 从LLM服务取最近一次token用量（评测可观测性）
+        from app.services.llm_service import get_last_usage
+        tokens = get_last_usage()
+
         exec_record = AgentExecution(
             agent_type=agent_type,
             input_data=input_data,
-            output_data={"response_preview": str(output_data.get("response", ""))[:200]},
+            output_data={
+                "response_preview": str(output_data.get("response", ""))[:200],
+                "tokens": tokens,  # token用量
+            },
             duration_ms=duration_ms,
             status=status,
         )
