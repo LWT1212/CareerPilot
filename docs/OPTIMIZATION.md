@@ -412,6 +412,15 @@ AI主动驱动成长（PRD核心）：薄弱点学习计划+文档更新提醒+�
 | 后台任务不能复用请求的db session | process_document 内部新建 SessionLocal |
 | embed用asyncio.run会阻塞/报错 | 保持同步requests，放后台线程执行 |
 
+### 二次优化（全链路异步化 + DB解耦）
+1. rag_service：embed_texts_async（asyncio.to_thread）+ search_documents/build_rag_context 改 async
+2. knowledge_service.search_knowledge 改 async
+3. agent_tools：全部工具解耦到 service 层（experience_service/interview_service/document_service/knowledge_service），不再直接写 db.query
+4. langgraph_workflow：_build_project_context 改 async + await build_rag_context
+5. chats.py：RAG 检索 await
+
 ### 验证
 - 上传接口0秒返回（原来等待索引）✅
 - 3秒后后台自动完成索引（processing→completed）✅
+- 知识检索0秒返回（embedding异步不阻塞）✅
+- 聊天多智能体+RAG链路正常 ✅
