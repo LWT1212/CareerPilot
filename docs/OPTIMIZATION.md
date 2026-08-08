@@ -94,7 +94,7 @@
 | 任务 | 内容 |
 |------|------|
 | [x] T17 O5 | MCP工具接入 + 内置工具集 |
-| [ ] T18 O6 | Skill系统 + Prompt模板库 |
+| [x] T18 O6 | Skill系统 + Prompt模板库 |
 | [ ] T19 O7 | 工程优化（PostgreSQL/异步/测试） |
 
 ---
@@ -343,16 +343,41 @@ AI主动驱动成长（PRD核心）：薄弱点学习计划+文档更新提醒+�
 
 ## T18 O6: Skill系统 + Prompt模板库
 
-**状态**: ⏳ 待开始
+**状态**: ✅ 已完成（经验沉淀Skill）(2026-08-06)
 
 ### 优化目标
-_（待填写）_
+给Agent预置"专业技能包"（Skill）：触发词匹配→专属逻辑执行
 
 ### 详细步骤
-_（实施后填写）_
+
+**S1. Skill框架（skills/目录）**
+1. `base.py`：Skill抽象基类（name/description/execute）
+2. `__init__.py`：空模块
+3. `skills_manager.py`：SkillsManager类
+   - register() 注册
+   - match() 关键词触发匹配
+   - execute() 执行
+   - 全局单例 + register_all_skills()
+
+**S2. 第一个Skill（experience_curator.py）**
+1. ExperienceCurator（经验沉淀师）：
+   - 组装"问题+最近AI回答"上下文
+   - LLM结构化提取（ExperienceExtractOutput）
+   - 调用 save_experience 写入 experiences 表
+   - 返回确认信息
+
+**S3. 接入聊天（chats.py）**
+1. 手动触发：send接口先 match() → 命中Skill则执行作为回复（agent_used=skill:xxx）
+2. 自动沉淀：每5条消息后静默执行 experience_curator
 
 ### 遇到的问题
-_（实施后填写）_
+| 问题 | 解决 |
+|------|------|
+| 用户终端写入文件全为0字节 | 改用write工具直接写入 |
+| chats.py S4未接入 | 直接编辑恢复 |
+
+### 验证
+- "沉淀这个经验：Docker权限问题" → skill:experience_curator → 写入experiences表 ✅
 
 ---
 
