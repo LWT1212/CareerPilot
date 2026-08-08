@@ -116,9 +116,9 @@ def delete_document(db: Session, doc_id: str, project_id=None):
 
 
 # 知识检索（语义检索，基于ChromaDB；全局检索用 "global" 集合）
-def search_knowledge(db: Session, project_id, query: str, top_k: int = 5):
+async def search_knowledge(db: Session, project_id, query: str, top_k: int = 5):
     collection_key = project_id or "global"
-    results = search_documents(collection_key, query, top_k)
+    results = await search_documents(collection_key, query, top_k)
 
     # 补充文档文件名信息
     output = []

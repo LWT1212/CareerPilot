@@ -21,7 +21,7 @@ from app.services.llm_service import chat_completion, stream_completion
 from app.services.rag_service import build_rag_context
 
 
-def _build_system_prompt(db: Session, chat_id: str, user_message: str) -> str:
+async def _build_system_prompt(db: Session, chat_id: str, user_message: str) -> str:
     """
     构建系统提示词
     如果聊天属于某个项目，检索该项目知识库作为RAG上下文
@@ -32,7 +32,7 @@ def _build_system_prompt(db: Session, chat_id: str, user_message: str) -> str:
         return ""  # 全局聊天无RAG
 
     # 检索项目知识库
-    context = build_rag_context(chat.project_id, user_message, top_k=3)
+    context = await build_rag_context(chat.project_id, user_message, top_k=3)
     if not context:
         return ""
 
@@ -268,7 +268,7 @@ async def stream_send(chat_id: str, message_data: MessageCreate, db: Session = D
             system_prompt = ""
             if intent == "knowledge" and project_id:
                 from app.services.rag_service import build_rag_context
-                context = build_rag_context(project_id, message_data.content, top_k=3)
+                context = await build_rag_context(project_id, message_data.content, top_k=3)
                 if context:
                     system_prompt = f"你是知识助手，请基于资料回答：\n【资料】\n{context}"
             elif intent == "experience":

@@ -137,13 +137,13 @@ def delete(project_id: str, doc_id: str, db: Session = Depends(get_db)):
 
 # 知识检索
 @router.post("/search", response_model=KnowledgeSearchResponse)
-def search(project_id: str, search_data: KnowledgeSearchRequest, db: Session = Depends(get_db)):
+async def search(project_id: str, search_data: KnowledgeSearchRequest, db: Session = Depends(get_db)):
     """
     知识检索（RAG）
     - query: 搜索关键词
     - top_k: 返回结果数量
     """
-    results = search_knowledge(db, project_id, search_data.query, search_data.top_k)
+    results = await search_knowledge(db, project_id, search_data.query, search_data.top_k)
     return KnowledgeSearchResponse(
         results=results,
         query=search_data.query,

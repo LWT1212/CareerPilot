@@ -183,7 +183,7 @@ async def _agent_with_tools(state: AgentState, agent_name: str,
                 if memory_prompt:
                     system_prompt += f"\n\n{memory_prompt}"
                 # 项目当前数据
-                ctx = _build_project_context(db, project_id, message, agent_name)
+                ctx = await _build_project_context(db, project_id, message, agent_name)
                 if ctx:
                     system_prompt += f"\n\n【项目当前数据】\n{ctx}"
 
@@ -217,7 +217,7 @@ async def _answer_with_memory(state: AgentState, agent_name: str,
     return response
 
 
-def _build_project_context(db: Session, project_id: str, message: str, agent_name: str = "") -> str:
+async def _build_project_context(db: Session, project_id: str, message: str, agent_name: str = "") -> str:
     """按Agent类型注入项目上下文：经验/面试/知识库"""
     parts = []
 
@@ -246,7 +246,7 @@ def _build_project_context(db: Session, project_id: str, message: str, agent_nam
     # 知识Agent：注入RAG检索
     if agent_name in ("knowledge", "chat", ""):
         try:
-            context = build_rag_context(project_id, message, top_k=3)
+            context = await build_rag_context(project_id, message, top_k=3)
             if context:
                 parts.append("知识库相关:\n" + context[:400])
         except Exception:

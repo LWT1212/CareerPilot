@@ -1,5 +1,8 @@
 # RAG服务 - 文档解析、分块、向量嵌入、检索
 # 流程: 文档 → 解析 → 分块 → 嵌入 → ChromaDB → 检索 → 组装上下文
+# 说明:
+#   - 同步函数: 供后台线程(process_document)使用
+#   - 异步函数: 供事件循环(聊天RAG检索)使用，不阻塞
 
 import os
 import uuid
@@ -24,8 +27,10 @@ def _get_collection(project_id: str):
     return _client.get_or_create_collection(name=collection_name)
 
 
+# ============ 向量嵌入 ============
+
 def embed_texts(texts: List[str]) -> List[List[float]]:
-    """调用 Ollama embedding 模型生成向量（同步；调用方决定在线程池还是后台任务中执行）"""
+    """调用 Ollama embedding 生成向量（同步，供后台线程使用）"""
     import requests
     response = requests.post(
         f"{settings.OLLAMA_BASE_URL}/api/embed",
@@ -35,6 +40,15 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     response.raise_for_status()
     return response.json()["embeddings"]
 
+
+async def embed_texts_async(texts: List[str]) -> List[List[float]]:
+    """调用 Ollama embedding 生成向量（异步，供事件循环使用，不阻塞）"""
+    import asyncio
+    # 同步requests放到线程池，避免阻塞事件循环
+    return await asyncio.to_thread(embed_texts, texts)
+
+
+# ============ 文档解析 ============
 
 def parse_document(file_path: str, file_type: str) -> str:
     """解析文档为纯文本"""
@@ -67,11 +81,12 @@ def chunk_text(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> Lis
     return splitter.split_text(text)
 
 
+# ============ 索引（后台线程使用） ============
+
 def index_document(project_id: str, doc_id: str, file_path: str, file_type: str) -> int:
     """
-    对文档进行索引：
-    解析 → 分块 → 嵌入 → 存入ChromaDB
-    返回分块数量
+    对文档进行索引：解析 → 分块 → 嵌入 → 存入ChromaDB
+    返回分块数量（同步，供后台任务 process_document 使用）
     """
     # 1. 解析文档
     text = parse_document(file_path, file_type)
@@ -108,14 +123,16 @@ def delete_document_vectors(project_id: str, doc_id: str):
         print(f"删除向量失败: {e}")
 
 
-def search_documents(project_id: str, query: str, top_k: int = 5) -> List[dict]:
+# ============ 检索（异步，聊天流程使用） ============
+
+async def search_documents(project_id: str, query: str, top_k: int = 5) -> List[dict]:
     """
-    语义检索：查询向量 → 返回Top-K结果
+    语义检索：查询向量 → 返回Top-K结果（异步，embedding不阻塞事件循环）
     """
     try:
         collection = _get_collection(project_id)
-        # 生成查询向量
-        query_embedding = embed_texts([query])[0]
+        # 生成查询向量（异步）
+        query_embedding = (await embed_texts_async([query]))[0]
         # 检索
         results = collection.query(
             query_embeddings=[query_embedding],
@@ -136,9 +153,9 @@ def search_documents(project_id: str, query: str, top_k: int = 5) -> List[dict]:
         return []
 
 
-def build_rag_context(project_id: str, query: str, top_k: int = 5) -> str:
-    """构建RAG上下文：检索相关内容并组装"""
-    results = search_documents(project_id, query, top_k)
+async def build_rag_context(project_id: str, query: str, top_k: int = 5) -> str:
+    """构建RAG上下文：检索相关内容并组装（异步）"""
+    results = await search_documents(project_id, query, top_k)
     if not results:
         return ""
 
