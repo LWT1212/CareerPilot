@@ -69,6 +69,50 @@
 - 并发: 100用户模拟
 - Token统计: prompt/completion/total + 记忆注入+RAG上下文占比
 
+## 层面9：Redis 缓存评测（T20新增）
+
+**目标**：验证 LLM 响应缓存的实际收益（速度+token）
+
+### 9.1 缓存命中 vs 未命中对比
+
+```
+同一问题连续调用2次（先清缓存再测）:
+
+第1次(未命中): 响应时间 Xs, prompt_tokens A, completion_tokens B, total C
+第2次(命中):   响应时间 ~0s, 消耗token 0
+
+记录:
+  未命中耗时 | 命中耗时 | 提速倍数
+  未命中token | 命中token | token节省量
+```
+
+### 9.2 缓存命中率（真实场景）
+
+- 用层面1-2的测试集跑2轮：第1轮全部未命中，第2轮应该全部命中
+- 指标: `Cache Hit Rate` = 命中数 / 总请求数（第2轮应接近100%）
+
+### 9.3 缓存正确性
+
+- 同一问题两次回答是否一致（命中返回的内容=未命中内容）
+- 不同 system_prompt 是否误命中（key含prompt，不应串）
+- 不同历史上下文是否误命中
+
+### 9.4 缓存降级
+
+- 停掉 Redis → 聊天/意图识别是否正常（try-except降级，走LLM原逻辑）
+- 指标: `Cache Failure Degradation`（Redis挂掉后成功率）
+
+### 9.5 缓存空间/清理
+
+- 测试后 keyspace: 缓存条目数、占内存（redis-cli dbsize / memory usage）
+
+### 9.6 对多智能体链路的影响
+
+- 完整聊天请求（含意图识别+工具判断）命中缓存后总耗时 vs 未命中
+- 意图识别/工具判断这类结构化输出是否也受益于缓存
+
+**指标汇总**：命中/未命中耗时对比、token节省、命中率、降级成功率
+
 ## 实施产物
 
 - scripts/eval/orchestration_test.py (层面1)
@@ -79,12 +123,15 @@
 - scripts/eval/collab_test.py (层面6)
 - scripts/eval/fault_injection_test.py (层面7)
 - scripts/eval/perf_test.py (层面8)
+- scripts/eval/redis_cache_test.py (层面9，新增)
 - docs/EVALUATION.md (汇总报告)
 
 ## 实施顺序
 
-第0步 补可观测性 → 层面1-2 → 层面3+7 → 层面4-5 → 层面6+8 → 汇总报告
+第0步 补可观测性 → 层面1-2 → 层面3+7 → 层面4-5 → 层面6+8 → 层面9(Redis) → 汇总报告
 
 ## 相关待办
 
-- Redis 未实现（V2规划）：缓存/会话存储，评测层面8并发测试可能需要
+- Redis 已实现（T20）：LLM响应缓存 ✅
+- 会话缓存/热点数据缓存（V2后续可选）
+
