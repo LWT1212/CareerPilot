@@ -25,12 +25,12 @@ def _get_collection(project_id: str):
 
 
 def embed_texts(texts: List[str]) -> List[List[float]]:
-    """调用 Ollama embedding 模型生成向量"""
+    """调用 Ollama embedding 模型生成向量（同步；调用方决定在线程池还是后台任务中执行）"""
     import requests
     response = requests.post(
         f"{settings.OLLAMA_BASE_URL}/api/embed",
         json={"model": "nomic-embed-text", "input": texts},
-        timeout=60,
+        timeout=120,
     )
     response.raise_for_status()
     return response.json()["embeddings"]

@@ -15,6 +15,7 @@ from app.services.rag_service import (
 
 
 # 上传文档（project_id 为空 = 全局知识库）
+# 第一步：快速保存文件+建记录（立即返回，不阻塞）
 def upload_document(db: Session, project_id, filename: str, file_content: bytes, file_type: str):
     # 生成唯一文件名
     file_id = str(uuid.uuid4())
@@ -26,7 +27,7 @@ def upload_document(db: Session, project_id, filename: str, file_content: bytes,
     with open(file_path, "wb") as f:
         f.write(file_content)
 
-    # 创建数据库记录
+    # 创建数据库记录（状态=processing，后台任务会更新为completed）
     new_doc = KnowledgeDocument(
         project_id=project_id,  # 可为空（全局）
         filename=filename,
@@ -38,24 +39,39 @@ def upload_document(db: Session, project_id, filename: str, file_content: bytes,
     db.add(new_doc)
     db.commit()
     db.refresh(new_doc)
-
-    # 索引文档：解析 → 分块 → 嵌入 → 存入ChromaDB
-    # 全局文档用 "global" 作为集合名
-    collection_key = project_id or "global"
-    try:
-        chunk_count = index_document(collection_key, new_doc.id, file_path, file_type)
-        new_doc.embedding_status = "completed"
-        new_doc.embedding_count = chunk_count
-        # 保存解析后的纯文本
-        new_doc.content = parse_document(file_path, file_type)[:5000]
-        db.commit()
-    except Exception as e:
-        print(f"文档索引失败: {e}")
-        new_doc.embedding_status = "failed"
-        db.commit()
-
-    db.refresh(new_doc)
     return new_doc
+
+
+# 第二步：后台索引文档（解析 → 分块 → 嵌入 → 存ChromaDB）
+# 由 BackgroundTasks 在后台线程调用，不阻塞上传接口
+def process_document(doc_id: str, project_id):
+    """
+    后台处理文档索引
+    注意：必须新建数据库会话（后台任务运行时，请求的session已关闭）
+    """
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        # 重新查找文档
+        doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first()
+        if not doc:
+            return
+
+        collection_key = project_id or "global"
+        try:
+            chunk_count = index_document(collection_key, doc.id, doc.file_path, doc.file_type)
+            doc.embedding_status = "completed"
+            doc.embedding_count = chunk_count
+            # 保存解析后的纯文本
+            doc.content = parse_document(doc.file_path, doc.file_type)[:5000]
+        except Exception as e:
+            print(f"文档索引失败: {e}")
+            doc.embedding_status = "failed"
+
+        db.commit()
+    finally:
+        db.close()
 
 
 # 获取文档列表（project_id 为空 = 全局文档）

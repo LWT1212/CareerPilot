@@ -1,6 +1,6 @@
 # 知识库相关的API接口
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas.knowledge import (
@@ -10,6 +10,7 @@ from app.schemas.knowledge import (
 )
 from app.services.knowledge_service import (
     upload_document,
+    process_document,
     get_documents,
     get_document,
     delete_document,
@@ -25,13 +26,20 @@ global_router = APIRouter(prefix="/knowledge", tags=["全局知识库"])
 
 # 上传到全局知识库
 @global_router.post("", response_model=KnowledgeDocumentResponse)
-async def upload_global(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_global(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     """上传到全局知识库（不属于任何项目）"""
     file_content = file.file.read()
     file_type = file.filename.split(".")[-1].lower()
     if file_type not in ["pdf", "docx", "doc", "md", "txt"]:
         raise HTTPException(status_code=400, detail="不支持的文件格式")
-    return upload_document(db, None, file.filename, file_content, file_type)
+    doc = upload_document(db, None, file.filename, file_content, file_type)
+    # 后台索引（不阻塞上传）
+    background_tasks.add_task(process_document, doc.id, None)
+    return doc
 
 
 # 获取全局知识库列表
@@ -46,9 +54,14 @@ def list_global_documents(skip: int = 0, limit: int = 20, db: Session = Depends(
 
 # 上传文档到项目
 @router.post("", response_model=KnowledgeDocumentResponse)
-async def upload(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload(
+    project_id: str,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     """
-    上传知识文档到项目
+    上传知识文档到项目（后台异步索引）
     支持格式：PDF, Word, Markdown, TXT
     """
     # 读取文件内容
@@ -61,15 +74,35 @@ async def upload(project_id: str, file: UploadFile = File(...), db: Session = De
 
     doc = upload_document(db, project_id, file.filename, file_content, file_type)
 
-    # 主动成长：新文档影响分析（后台触发）
-    if doc.embedding_status == "completed":
+    # 后台索引文档（不阻塞上传接口）
+    background_tasks.add_task(process_document, doc.id, project_id)
+
+    # 主动成长：新文档影响分析（后台执行，等索引完成后分析）
+    def _impact_analysis():
+        import time
+        import asyncio
+        from app.db import SessionLocal
+        from app.models.knowledge import KnowledgeDocument
+        from app.services.proactive_service import analyze_knowledge_impact
+
+        session = SessionLocal()
         try:
-            from app.services.proactive_service import analyze_knowledge_impact
-            content = doc.content or ""
-            if content:
-                await analyze_knowledge_impact(db, project_id, content)
+            # 等待后台索引完成（最多等30秒）
+            for _ in range(30):
+                doc_now = session.query(KnowledgeDocument).filter(
+                    KnowledgeDocument.id == doc.id
+                ).first()
+                if doc_now and doc_now.embedding_status == "completed":
+                    break
+                time.sleep(1)
+            if doc_now and doc_now.content:
+                asyncio.run(analyze_knowledge_impact(session, project_id, doc_now.content))
         except Exception as e:
             print(f"知识库影响分析失败: {e}")
+        finally:
+            session.close()
+
+    background_tasks.add_task(_impact_analysis)
 
     return doc
 
