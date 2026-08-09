@@ -1,0 +1,24 @@
+{
+  "mcp": {
+    "success_rate": "10/10=100%",
+    "avg_delay": 0.82
+  },
+  "memory": {
+    "recall": true,
+    "memories": 5
+  },
+  "collab": {
+    "trace_steps": 2,
+    "trace_complete": true
+  },
+  "perf": {
+    "concurrency10": 0.07,
+    "avg": 0.058,
+    "ok": 10
+  },
+  "redis": {
+    "miss": 9.1,
+    "hit": 5.36,
+    "same": false
+  }
+}

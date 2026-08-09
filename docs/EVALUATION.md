@@ -167,3 +167,38 @@
 ### 🐛 发现的缺陷3: token 统计不完整
 
 coordinator 的 token 显示 245（非0）但工具步骤也是245——每次都是同一个值，说明 `get_last_usage()` 记录的是"最后一次LLM调用"的usage，多步骤时可能被覆盖/重复。需按节点分别记录。
+
+---
+
+## 综合评测（层面3/5/6/8/9）
+
+**结果文件**: scripts/eval/results/remaining_evals.json
+
+| 层面 | 结果 | 详情 |
+|------|------|------|
+| 3 MCP | ✅ 100% | 10/10成功率，平均延迟0.82s |
+| 5 Memory | ✅ | 5条决策记忆，跨会话召回PostgreSQL |
+| 6 协作 | ✅ | Trace完整（coordinator→knowledge(tool)链）|
+| 8 性能 | ✅ | 并发10读接口10/10成功，总耗时0.07s |
+| 9 Redis | ❌ | 缓存命中未生效（缺陷4）|
+
+### 🐛 缺陷4: Redis缓存key含聊天历史，导致无法命中
+
+**现象**: 同一问题第1次9.1s，第2次5.36s（应0s），且回答不一致。
+
+**根因**: chat_completion 缓存key = system_prompt + 用户消息 + **最近6条history**。
+两次调用时，chat里第1轮的user+assistant消息已入库，导致第2次的history不同→key不同→未命中。
+
+**影响**: 聊天场景缓存几乎失效（只有完全相同的context才能命中）。
+
+**修复建议**: 缓存key只基于"用户消息+system_prompt"（不考虑history），或按聊天上下文单独设计。
+
+### 🐛 缺陷5: Skill调用不记录到agent_executions
+
+**现象**: 走 skill 路径的请求（如"沉淀经验"）不产生 trace 记录。
+
+**根因**: chats.py 中 skill 命中时直接 skills_manager.execute，未调用 _record_execution。
+
+**影响**: 可观测性缺口，skill 调用无法在 executions 中追踪。
+
+**修复建议**: skill 路径也记录 agent_executions。
