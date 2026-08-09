@@ -1,0 +1,38 @@
+{
+  "concurrency": {
+    "ok": 5,
+    "total": 5,
+    "total_s": 0.38,
+    "times": [
+      0.1,
+      0.2,
+      0.2,
+      0.2,
+      0.2
+    ],
+    "errors": []
+  },
+  "latency_split": {
+    "api_total": 24.51,
+    "trace": [
+      {
+        "agent": "skill:experience_curator",
+        "duration_ms": 24475,
+        "status": "success",
+        "prompt_tok": 0,
+        "completion_tok": 0,
+        "total_tok": 0
+      }
+    ],
+    "summary": {
+      "steps_count": 1,
+      "total_ms": 24475,
+      "total_tok": 0,
+      "coordinator_ms": null,
+      "coordinator_tok": null,
+      "tool_steps": 0,
+      "tool_ms": 0,
+      "tool_tok": 0
+    }
+  }
+}
