@@ -1,0 +1,35 @@
+{
+  "latency": {
+    "api_total": 11.67,
+    "trace": [],
+    "summary": {
+      "steps_count": 0,
+      "total_ms": 0,
+      "total_tok": 0,
+      "coordinator_ms": null,
+      "coordinator_tok": null,
+      "tool_steps": 0,
+      "tool_ms": 0,
+      "tool_tok": 0
+    }
+  },
+  "concurrency": {
+    "read20": {
+      "ok": 20,
+      "total_s": 0.12,
+      "avg_ms": 111
+    },
+    "write5": {
+      "ok": 5,
+      "total_s": 11.85
+    }
+  },
+  "token": {
+    "steps": 1,
+    "total_tok": 345
+  },
+  "redis": {
+    "miss": 49.4,
+    "hit": 20.71
+  }
+}
