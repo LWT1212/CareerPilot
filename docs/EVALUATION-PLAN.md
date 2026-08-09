@@ -95,6 +95,49 @@ coordinator(intent=interview, 400ms)
 ```
 - 指标: Trace Chain Completeness（每跳agent_type/duration/status齐全的比例）
 
+## 步骤级指标（所有评测的强制要求）
+
+> 每个测试用例不只记录最终结果，必须提取执行 trace 的**每一步**指标。
+
+### 每步记录什么
+
+| 步骤 | 耗时 | token | 准确率依据 |
+|------|------|-------|-----------|
+| coordinator 意图识别 | duration_ms | prompt/completion tokens | intent 是否正确 |
+| agent 节点执行 | duration_ms | tokens | 工具选择是否正确 |
+| tool 调用 | duration_ms | tokens | 参数是否完整 |
+| LLM 最终生成 | duration_ms | tokens | 回答质量 |
+| **总计** | 总和 | 总和 | 最终结果 |
+
+### 数据来源
+
+每次请求后调用 `GET /api/v1/agents/executions`，按时间过滤该请求产生的 trace：
+
+```
+coordinator(intent=interview, 350ms, 120tok)
+→ interview(1100ms, 890tok)
+→ interview(tool:get_interview_stats, 250ms, 0tok)
+→ (最终回复)
+```
+
+### 评测输出格式（每用例）
+
+```
+用例: "沉淀经验:XXX"
+├─ coordinator:  350ms | 120tok | intent=experience ✅
+├─ experience:  1100ms | 890tok | 工具选择=save_experience ✅
+├─ tool执行:     250ms | 0tok   | 参数完整(type=solution) ✅
+├─ 总耗时:      1700ms | 1010tok
+└─ 最终结果:     ✅ 已保存
+```
+
+### 汇总指标
+
+- 各步骤平均耗时 / P95
+- 各步骤平均 token
+- 各步骤准确率（intent正确率 / 工具选择率 / 参数完整率）
+- 每步占总耗时比例（找瓶颈）
+
 ## 层面1：Agent流程测试（编排）
 
 - 测试集: 30问（5类各6个）
