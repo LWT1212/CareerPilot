@@ -1,0 +1,39 @@
+{
+  "temperature": {
+    "0.0": {
+      "accuracy": 100.0,
+      "correct": 10,
+      "total": 10,
+      "elapsed_s": 25.9
+    },
+    "0.7": {
+      "accuracy": 100.0,
+      "correct": 10,
+      "total": 10,
+      "elapsed_s": 29.7
+    },
+    "1.0": {
+      "accuracy": 100.0,
+      "correct": 10,
+      "total": 10,
+      "elapsed_s": 23.6
+    }
+  },
+  "history_window": {
+    "5": {
+      "total_tok": 753,
+      "prompt_tok": 112,
+      "completion_tok": 641
+    },
+    "10": {
+      "total_tok": 1075,
+      "prompt_tok": 206,
+      "completion_tok": 869
+    },
+    "15": {
+      "total_tok": 790,
+      "prompt_tok": 206,
+      "completion_tok": 584
+    }
+  }
+}
