@@ -346,3 +346,69 @@ checkpoint 保存时抛错 → 断点恢复完全不可用
 ### ✅ 验证
 - 聊天+工具写库正常（managed db生效）✅
 - checkpoint测试 3/3：同thread 10.9s→0.0s（命中checkpoint）✅
+
+---
+
+## 附: LangGraph 断点恢复完整说明（原理+实现+评测）
+
+### 一、断点恢复原理
+
+LangGraph 执行时，**每个节点执行完都保存一次 State 快照**（checkpoint），用 `thread_id` 管理：
+
+```
+用户请求(thread_id=chat-123)
+  ↓
+coordinator 节点 ──执行完──> 保存快照① (message/intent)
+  ↓
+knowledge 节点 ──执行完──> 保存快照②
+  ↓
+...中断/崩溃/新请求
+  ↓
+同 thread_id 再次调用 → 从快照②继续
+  → coordinator 不重跑，省 token、状态不丢
+```
+
+**类比**: 游戏存档——打到第3关存档，下次从第3关继续，不重打前2关。
+
+### 二、实现方式
+
+```python
+# 1. 给图加 checkpointer（一行）
+from langgraph.checkpoint.memory import MemorySaver
+
+def build_agent_graph():
+    ...
+    return workflow.compile(checkpointer=MemorySaver())
+
+# 2. 用 thread_id 管理会话（一个聊天=一个thread）
+config = {"configurable": {"thread_id": "chat-123"}}
+result = await agent_graph.ainvoke(state, config)
+# 同 thread_id 再次调用 → 命中 checkpoint，状态延续
+```
+
+### 三、关键坑: State 里不能放不可序列化对象
+
+| 对象 | 可序列化 | 说明 |
+|------|----------|------|
+| str/int/dict/list | ✅ | 业务数据，可持久化 |
+| SQLAlchemy Session | ❌ | 连接资源，msgpack 不支持 |
+| 文件句柄/连接 | ❌ | 同上 |
+
+**原则**: State 只放"能决定输出且可序列化"的数据；连接资源用 managed value 按需注入。
+
+### 四、评测结果（checkpoint_test.py）
+
+| 用例 | 验证什么 | 结果 |
+|------|----------|------|
+| A1 checkpoint保存 | 同 thread 复用 | ✅ 10.9s → 0.0s（命中不重跑）|
+| A2 中断恢复 | coordinator→knowledge 完整执行 | ✅ intent=knowledge |
+| A3 状态连续性 | checkpoint 可查询已保存 state | ✅ message 正确保存 |
+
+**核心数据**: 同 thread 第二次执行 10.9s → 0.0s
+
+### 五、面试话术
+
+> "我验证了 LangGraph 的 checkpoint 断点恢复：给图加 MemorySaver，用 thread_id 管理会话。
+> 测试发现真实架构问题——AgentState 里的数据库会话导致 checkpoint 序列化失败。
+> 我改成 managed value 模式（连接资源按需注入、不参与持久化）。
+> 修复后同一线程第二次执行从 10.9s 降到 0s，验证了中断后从保存点继续、不重跑已完成步骤的能力。"
