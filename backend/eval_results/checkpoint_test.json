@@ -1,0 +1,21 @@
+{
+  "ok": 3,
+  "total": 3,
+  "results": [
+    {
+      "case": "A1 checkpoint保存",
+      "ok": true,
+      "detail": "r1=10.9s r2=0.0s intent=chat"
+    },
+    {
+      "case": "A2 中断恢复",
+      "ok": true,
+      "detail": "intent=knowledge"
+    },
+    {
+      "case": "A3 状态连续性",
+      "ok": true,
+      "detail": "response=2441字符, state有message=介绍一下FastAPI"
+    }
+  ]
+}

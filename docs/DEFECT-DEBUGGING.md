@@ -305,3 +305,44 @@ Skill 调用现在有 agent_executions 记录。
 4. 定位根因后，用"最小修改"修复
 5. 复测验证（修复前 vs 修复后数据对比）
 ```
+
+---
+
+## 缺陷6: LangGraph checkpoint 断点恢复失败（Session不可序列化）
+
+### 🎯 从哪个测试发现
+**测试**: checkpoint_test.py（断点恢复专项，新增）
+
+**测试动作**: 给图加 MemorySaver checkpoint 后，直接 ainvoke
+
+**测试结果（关键数据点）**:
+```
+Type is not msgpack serializable: Session
+```
+checkpoint 保存时抛错 → 断点恢复完全不可用
+
+### 🔍 定位推理链
+```
+观察: checkpoint保存报"Session不可序列化"
+  ↓
+最小化测试: 只放字符串的state → checkpoint成功 ✅
+           显式传object() → 报"不可序列化" ❌
+  ↓
+对比: 我们的AgentState里有 db: Session 字段
+      且 run_agent 显式传 db=db 到初始state
+  ↓
+结论: ① state schema 含 Session（SQLAlchemy会话不可序列化）
+      ② 初始state显式塞了Session对象
+      → checkpoint 机制无法持久化
+```
+
+### 🛠️ 为什么这样修
+**修复**: 
+1. AgentState.db 改为 managed value（DbValue），节点执行时自动创建session，不参与持久化
+2. run_agent 不再显式传 db 到初始 state
+
+**理由**: LangGraph checkpoint 会序列化整个 state。数据库会话这类"连接资源"不应进 state——应该由框架按需注入（managed value 模式），这是多智能体的标准架构实践。
+
+### ✅ 验证
+- 聊天+工具写库正常（managed db生效）✅
+- checkpoint测试 3/3：同thread 10.9s→0.0s（命中checkpoint）✅

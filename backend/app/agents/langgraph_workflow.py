@@ -2,12 +2,20 @@
 # 架构: Coordinator(意图识别) → 条件路由 → 专业Agent(调用真实工具) → 返回
 # 特性: Agent真实操作数据库 + 执行过程记录 + 工具选择
 
-from typing import TypedDict
+from typing import TypedDict, Annotated
 import time
 import inspect
 from sqlalchemy.orm import Session
 
 from langgraph.graph import StateGraph, END
+from langgraph.managed.base import ManagedValue
+
+# managed值：每次节点执行创建新db session，不参与checkpoint序列化（缺陷6修复）
+class DbValue(ManagedValue):
+    @staticmethod
+    def get(scratchpad):
+        from app.db import SessionLocal
+        return SessionLocal()
 
 from app.services.llm_service import chat_completion, structured_completion
 from app.services.rag_service import build_rag_context
@@ -27,7 +35,8 @@ class AgentState(TypedDict):
     message: str          # 用户消息
     project_id: str       # 当前项目（可为空）
     chat_history: list    # 聊天历史
-    db: object            # 数据库会话
+    # db: managed值，不参与checkpoint序列化（修复缺陷6：Session不可序列化）
+    db: Annotated[object, DbValue]
     intent: str           # 识别出的意图
     response: str         # 最终回复
     execution_log: list   # 执行过程日志
@@ -399,7 +408,9 @@ def build_agent_graph():
     for node in ["knowledge", "experience", "interview", "document", "chat"]:
         workflow.add_edge(node, END)
 
-    return workflow.compile()
+    # 带checkpoint编译（支持断点恢复/状态持久化）
+    from langgraph.checkpoint.memory import MemorySaver
+    return workflow.compile(checkpointer=MemorySaver())
 
 
 agent_graph = build_agent_graph()
@@ -409,14 +420,15 @@ async def run_agent(message: str, project_id: str = "", chat_history: list = Non
                     db: Session = None) -> dict:
     """
     运行多智能体工作流
-    db: 数据库会话（Agent操作数据库需要）
+    db: 数据库会话（保留参数兼容，实际由managed DbValue自动注入，避免checkpoint序列化）
     返回: {"intent": "...", "response": "...", "execution_log": [...]}
     """
     initial_state = {
         "message": message,
         "project_id": project_id,
         "chat_history": chat_history or [],
-        "db": db,
+        # db 不显式传入（managed DbValue会在节点执行时自动创建session，
+        # 修复缺陷6: Session不可序列化导致checkpoint断点恢复失败）
         "intent": "",
         "response": "",
         "execution_log": [],
