@@ -1,0 +1,200 @@
+{
+  "ok": 4,
+  "total": 5,
+  "rate": "4/5",
+  "results": [
+    {
+      "case": "沉淀经验",
+      "ok": "将当前用户加入docker用户组以获取执行权限。执行命令：`sudo usermod -aG docker $USER`，然后注销并重新登录，或者执行 `newgrp docker` 刷新用户组权限即可解决。",
+      "steps": [
+        {
+          "desc": "发送经验消息",
+          "method": "POST",
+          "path": "/chats/820f9bd5-ef04-49bb-b53e-7227650c6a06/messages",
+          "status": 200,
+          "ok": true,
+          "content": "✅ 经验「Docker部署失败提示权限不足的解决方法」已保存"
+        }
+      ],
+      "checks": [
+        {
+          "check": "DB落盘(type+solution)",
+          "ok": "将当前用户加入docker用户组以获取执行权限。执行命令：`sudo usermod -aG docker $USER`，然后注销并重新登录，或者执行 `newgrp docker` 刷新用户组权限即可解决。",
+          "detail": "('Docker部署失败提示权限不足的解决方法', 'solution', '将当前用户加入docker用户组以获取执行权限。执行命令：`sudo usermod -aG docker $USER`，然后注销并重新登录，或者执行 `newgrp docker` 刷新用户组权限即可解决。')"
+        }
+      ],
+      "trace": [],
+      "trace_summary": {
+        "steps_count": 0,
+        "total_ms": 0,
+        "total_tok": 0,
+        "coordinator_ms": null,
+        "coordinator_tok": null,
+        "tool_steps": 0,
+        "tool_ms": 0,
+        "tool_tok": 0
+      }
+    },
+    {
+      "case": "知识库RAG",
+      "ok": true,
+      "steps": [
+        {
+          "desc": "问文档内问题",
+          "method": "POST",
+          "path": "/chats/c52646f8-d91f-42f9-8bfe-8f694545b0a9/messages",
+          "status": 200,
+          "ok": true,
+          "content": "查询到 1 条记录：\n{'content': 'Redis支持RDB快照和AOF日志两种持久化机制。RDB在指定时间间隔保存快照，AOF记录每次写操作。', '"
+        }
+      ],
+      "checks": [
+        {
+          "check": "RAG命中(RDB+AOF)",
+          "ok": true,
+          "detail": "查询到 1 条记录：\n{'content': 'Redis支持RDB快照和AOF日志两种持久化机制。RDB在指定时间间隔"
+        }
+      ],
+      "trace": [
+        {
+          "agent": "knowledge(tool:search_project_knowledge)",
+          "duration_ms": 9960,
+          "status": "success",
+          "prompt_tok": 0,
+          "completion_tok": 0,
+          "total_tok": 0
+        },
+        {
+          "agent": "coordinator",
+          "duration_ms": 5599,
+          "status": "success",
+          "prompt_tok": 0,
+          "completion_tok": 0,
+          "total_tok": 0
+        }
+      ],
+      "trace_summary": {
+        "steps_count": 2,
+        "total_ms": 15559,
+        "total_tok": 0,
+        "coordinator_ms": 5599,
+        "coordinator_tok": 0,
+        "tool_steps": 1,
+        "tool_ms": 9960,
+        "tool_tok": 0
+      }
+    },
+    {
+      "case": "面试弱题→学习计划",
+      "ok": true,
+      "steps": [
+        {
+          "desc": "添加3个Redis弱题",
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "check": "学习计划生成",
+          "ok": true,
+          "detail": "1个"
+        }
+      ],
+      "trace": [],
+      "trace_summary": {
+        "total_ms": 0,
+        "total_tok": 0
+      }
+    },
+    {
+      "case": "跨会话记忆",
+      "ok": false,
+      "steps": [
+        {
+          "desc": "会话1告知决策→会话2提问",
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "check": "召回PostgreSQL",
+          "ok": false,
+          "detail": "查询到 1 条记录：\n{'content': 'Redis支持RDB快照和AOF日志两种持久化机制。RDB在指定时间间隔"
+        }
+      ],
+      "trace": [
+        {
+          "agent": "knowledge(tool:search_project_knowledge)",
+          "duration_ms": 4168,
+          "status": "success",
+          "prompt_tok": 708,
+          "completion_tok": 2257,
+          "total_tok": 2965
+        },
+        {
+          "agent": "coordinator",
+          "duration_ms": 8193,
+          "status": "success",
+          "prompt_tok": 708,
+          "completion_tok": 2257,
+          "total_tok": 2965
+        }
+      ],
+      "trace_summary": {
+        "steps_count": 2,
+        "total_ms": 12361,
+        "total_tok": 5930,
+        "coordinator_ms": 8193,
+        "coordinator_tok": 2965,
+        "tool_steps": 1,
+        "tool_ms": 4168,
+        "tool_tok": 2965
+      }
+    },
+    {
+      "case": "MCP外部工具",
+      "ok": true,
+      "steps": [
+        {
+          "desc": "查GitHub仓库",
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "check": "返回仓库数据",
+          "ok": true,
+          "detail": "{\n  \"name\": \"fastapi/fastapi\",\n  \"description\": \"FastAPI fra"
+        }
+      ],
+      "trace": [
+        {
+          "agent": "knowledge(tool:github_repo_info)",
+          "duration_ms": 4817,
+          "status": "success",
+          "prompt_tok": 708,
+          "completion_tok": 2257,
+          "total_tok": 2965
+        },
+        {
+          "agent": "coordinator",
+          "duration_ms": 10498,
+          "status": "success",
+          "prompt_tok": 708,
+          "completion_tok": 2257,
+          "total_tok": 2965
+        }
+      ],
+      "trace_summary": {
+        "steps_count": 2,
+        "total_ms": 15315,
+        "total_tok": 5930,
+        "coordinator_ms": 10498,
+        "coordinator_tok": 2965,
+        "tool_steps": 1,
+        "tool_ms": 4817,
+        "tool_tok": 2965
+      }
+    }
+  ]
+}
