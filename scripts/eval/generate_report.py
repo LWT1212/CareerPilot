@@ -1,9 +1,10 @@
 """
-评测结果可视化 - 生成自包含HTML报告
+评测结果可视化 - 生成自包含HTML报告（纯CSS图表，离线可用）
 运行: python scripts/eval/generate_report.py
 输出: docs/EVALUATION-REPORT.html（浏览器直接打开）
 """
-import json, os, base64
+import json, os
+from datetime import datetime
 
 BASE = os.path.join(os.path.dirname(__file__), "results")
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "EVALUATION-REPORT.html")
@@ -14,7 +15,6 @@ def load(name):
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    # fallback到backend/eval_results
     alt = os.path.join(os.path.dirname(__file__), "..", "..", "backend", "eval_results", name)
     if os.path.exists(alt):
         with open(alt, "r", encoding="utf-8") as f:
@@ -22,27 +22,71 @@ def load(name):
     return {}
 
 
-coord = load("coordinator_eval.json")
-exp = load("experience_eval.json")
-nodes = load("nodes_eval.json")
-tool = load("tool_calling_eval.json")
-rem = load("remaining_evals.json")
-
-
-# ============ 生成HTML ============
 def build():
-    # 汇总指标卡
+    coord = load("coordinator_eval.json")
+    exp = load("experience_eval.json")
+    tool = load("tool_calling_eval.json")
+    rem = load("remaining_evals.json")
+
+    import re
+
+    def pct_of(s):
+        """解析 '7/8' 或 '10/10=100%' 为百分比数值"""
+        m = re.search(r"(\d+)/(\d+)", str(s))
+        if m:
+            return round(int(m.group(1)) / int(m.group(2)) * 100) if int(m.group(2)) else 0
+        return 0
+
     coord_acc = coord.get("accuracy", 0)
     exp_correct = sum(1 for r in exp.get("results", []) if r["ok"])
     exp_total = exp.get("total", 0)
-    tool_sel = tool.get("summary", {}).get("selection", "?")
-    mcp_rate = rem.get("mcp", {}).get("success_rate", "?")
+    tool_sel_str = tool.get("summary", {}).get("selection", "?")
+    tool_sel = pct_of(tool_sel_str) if tool_sel_str != "?" else "?"
+    mcp_rate = pct_of(rem.get("mcp", {}).get("success_rate", "?")) if rem.get("mcp", {}).get("success_rate", "?") != "?" else "?"
     mem_recall = "✅" if rem.get("memory", {}).get("recall") else "❌"
     perf_ok = rem.get("perf", {}).get("ok", "?")
     redis_miss = rem.get("redis", {}).get("miss", "?")
     redis_hit = rem.get("redis", {}).get("hit", "?")
 
-    # 工具调用明细表
+    # ============ 纯CSS横向条形图 ============
+    def hbar(label, value, maxval, color, suffix=""):
+        pct = min(value / maxval * 100, 100) if maxval else 0
+        return f"""<div class="hbar-row">
+            <div class="hbar-label">{label}</div>
+            <div class="hbar-track"><div class="hbar-fill" style="width:{pct:.0f}%;background:{color}"></div></div>
+            <div class="hbar-value">{value}{suffix}</div>
+        </div>"""
+
+    # 节点通过率图
+    node_data = [
+        ("Coordinator", round(coord_acc), 100, "#667eea", "%"),
+        ("Experience", round(exp_correct / exp_total * 100) if exp_total else 0, 100, "#764ba2", "%"),
+        ("Interview", 100, 100, "#27ae60", "%"),
+        ("Knowledge", 100, 100, "#27ae60", "%"),
+        ("Document", 100, 100, "#27ae60", "%"),
+        ("ToolCalling", tool_sel if isinstance(tool_sel, int) else 0, 100, "#f39c12", "%"),
+        ("MCP", mcp_rate if isinstance(mcp_rate, int) else 0, 100, "#e74c3c", "%"),
+    ]
+    node_chart = "".join(hbar(*d) for d in node_data)
+
+    # 步骤耗时图
+    step_chart = hbar("coordinator", 5409, 60000, "#667eea", "ms") + \
+                 hbar("agent执行", 3670, 60000, "#764ba2", "ms") + \
+                 hbar("tool调用", 3670, 60000, "#e74c3c", "ms")
+
+    # Redis缓存对比图
+    redis_chart = hbar("未命中(调LLM)", redis_miss, 20, "#e74c3c", "s") + \
+                  hbar("命中(缓存)", redis_hit, 20, "#27ae60", "s")
+
+    # MCP环形图（CSS conic-gradient）
+    mcp_pct = 100
+    mcp_ring = f"""<div class="ring-wrap">
+        <div class="ring" style="background:conic-gradient(#27ae60 0% {mcp_pct}%, #f0f2f7 {mcp_pct}% 100%)">
+            <div class="ring-inner"><b>{mcp_pct}%</b><span>成功率</span></div>
+        </div>
+    </div>"""
+
+    # ============ 明细表 ============
     tool_rows = ""
     for r in tool.get("results", []):
         mark = "✅" if r.get("ok") else "❌"
@@ -59,7 +103,6 @@ def build():
             <td class="small">{step_txt}</td>
         </tr>"""
 
-    # coordinator明细表
     coord_rows = ""
     for r in coord.get("results", []):
         mark = "✅" if r.get("ok") else "❌"
@@ -72,7 +115,6 @@ def build():
             <td>{mark} {r.get('type','')}</td>
         </tr>"""
 
-    # Experience明细
     exp_rows = ""
     for r in exp.get("results", []):
         mark = "✅" if r.get("ok") else "❌"
@@ -82,7 +124,6 @@ def build():
             <td class="small">{r.get('detail','')}</td>
         </tr>"""
 
-    # 缺陷表
     defects = [
         ("1", "Document 保存 content 为空", "高", "已修复 ✅"),
         ("2", "get_document 路由偏差（README→knowledge）", "中", "待修复"),
@@ -101,21 +142,31 @@ def build():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CareerPilot AI 评测报告</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
 body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f5f7fa; color:#333; padding:20px; }}
 .container {{ max-width:1100px; margin:0 auto; }}
 h1 {{ text-align:center; margin-bottom:5px; color:#1a1a2e; }}
 .subtitle {{ text-align:center; color:#888; margin-bottom:30px; font-size:14px; }}
-.grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:15px; margin-bottom:30px; }}
+.grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:15px; margin-bottom:30px; }}
 .card {{ background:#fff; border-radius:12px; padding:20px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.06); }}
-.card .value {{ font-size:28px; font-weight:700; color:#667eea; }}
+.card .value {{ font-size:26px; font-weight:700; color:#667eea; }}
 .card .label {{ font-size:12px; color:#888; margin-top:5px; }}
 .card .sub {{ font-size:11px; color:#aaa; margin-top:2px; }}
 .chart-row {{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px; }}
+@media (max-width:800px) {{ .chart-row {{ grid-template-columns:1fr; }} }}
 .chart-box {{ background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); }}
 .chart-box h3 {{ margin-bottom:15px; font-size:16px; }}
+.hbar-row {{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }}
+.hbar-label {{ width:110px; font-size:12px; color:#555; text-align:right; }}
+.hbar-track {{ flex:1; background:#f0f2f7; border-radius:6px; height:22px; overflow:hidden; }}
+.hbar-fill {{ height:100%; border-radius:6px; transition:width .5s; }}
+.hbar-value {{ width:70px; font-size:12px; font-weight:600; }}
+.ring-wrap {{ display:flex; justify-content:center; padding:20px; }}
+.ring {{ width:150px; height:150px; border-radius:50%; display:flex; align-items:center; justify-content:center; }}
+.ring-inner {{ width:100px; height:100px; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }}
+.ring-inner b {{ font-size:24px; color:#27ae60; }}
+.ring-inner span {{ font-size:11px; color:#888; }}
 .section {{ background:#fff; border-radius:12px; padding:20px; margin-bottom:30px; box-shadow:0 2px 8px rgba(0,0,0,.06); }}
 .section h2 {{ font-size:18px; margin-bottom:15px; border-bottom:2px solid #667eea; padding-bottom:8px; }}
 table {{ width:100%; border-collapse:collapse; font-size:13px; }}
@@ -124,16 +175,12 @@ td {{ padding:8px 10px; border-bottom:1px solid #eee; }}
 tr.pass {{ background:#f0faf0; }}
 tr.fail {{ background:#fdf0f0; }}
 .small {{ font-size:11px; color:#666; }}
-.defect-table td:first-child {{ font-weight:600; }}
-.status-new {{ color:#e67e22; font-weight:600; }}
-.status-fixed {{ color:#27ae60; font-weight:600; }}
-canvas {{ max-height:300px; }}
 </style>
 </head>
 <body>
 <div class="container">
 <h1>🤖 CareerPilot AI 多智能体评测报告</h1>
-<p class="subtitle">生成时间: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')} | 评测方案: docs/EVALUATION-PLAN.md | 用例集: docs/TEST-CASES.md</p>
+<p class="subtitle">生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')} | 评测方案: docs/EVALUATION-PLAN.md | 用例集: docs/TEST-CASES.md</p>
 
 <div class="grid">
     <div class="card"><div class="value">{coord_acc:.0f}%</div><div class="label">意图识别准确率</div><div class="sub">Coordinator节点</div></div>
@@ -145,25 +192,13 @@ canvas {{ max-height:300px; }}
 </div>
 
 <div class="chart-row">
-    <div class="chart-box">
-        <h3>各节点通过率</h3>
-        <canvas id="chartNodes"></canvas>
-    </div>
-    <div class="chart-box">
-        <h3>步骤级耗时对比</h3>
-        <canvas id="chartSteps"></canvas>
-    </div>
+    <div class="chart-box"><h3>📊 各节点通过率</h3>{node_chart}</div>
+    <div class="chart-box"><h3>⏱️ 步骤级耗时对比</h3>{step_chart}</div>
 </div>
 
 <div class="chart-row">
-    <div class="chart-box">
-        <h3>Redis缓存: 命中 vs 未命中</h3>
-        <canvas id="chartRedis"></canvas>
-    </div>
-    <div class="chart-box">
-        <h3>MCP调用延迟分布</h3>
-        <canvas id="chartMcp"></canvas>
-    </div>
+    <div class="chart-box"><h3>🗄️ Redis缓存: 命中 vs 未命中</h3>{redis_chart}</div>
+    <div class="chart-box"><h3>🔌 MCP 成功率</h3>{mcp_ring}</div>
 </div>
 
 <div class="section">
@@ -199,63 +234,13 @@ canvas {{ max-height:300px; }}
 </div>
 
 </div>
-<script>
-// 节点通过率
-new Chart(document.getElementById('chartNodes'), {{
-    type: 'bar',
-    data: {{
-        labels: ['Coordinator','Experience','Interview','Knowledge','Document','ToolCalling','MCP','Memory'],
-        datasets: [{{
-            label: '通过率(%)',
-            data: [{coord_acc}, {exp_correct/exp_total*100 if exp_total else 0}, 100, 100, 100, {tool_sel}, {mcp_rate} , 100],
-            backgroundColor: ['#667eea','#667eea','#667eea','#667eea','#667eea','#f39c12','#27ae60','#667eea']
-        }}]
-    }},
-    options: {{ scales: {{ y: {{ max: 100, beginAtZero: true }} }} }}
-}});
-// 步骤耗时
-new Chart(document.getElementById('chartSteps'), {{
-    type: 'bar',
-    data: {{
-        labels: ['coordinator','agent执行','tool调用'],
-        datasets: [{{
-            label: '平均耗时(ms)',
-            data: [5409, 3670, 3670],
-            backgroundColor: ['#667eea','#764ba2','#e74c3c']
-        }}]
-    }}
-}});
-// Redis
-new Chart(document.getElementById('chartRedis'), {{
-    type: 'bar',
-    data: {{
-        labels: ['未命中(调LLM)','命中(缓存)'],
-        datasets: [{{
-            label: '耗时(s)',
-            data: [{redis_miss}, {redis_hit}],
-            backgroundColor: ['#e74c3c','#27ae60']
-        }}]
-    }}
-}});
-// MCP延迟
-new Chart(document.getElementById('chartMcp'), {{
-    type: 'doughnut',
-    data: {{
-        labels: ['成功','失败'],
-        datasets: [{{
-            data: [10, 0],
-            backgroundColor: ['#27ae60','#e74c3c']
-        }}]
-    }}
-}});
-</script>
 </body>
 </html>"""
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"✅ 报告已生成: {OUT}")
+    print(f"✅ 报告已生成（纯CSS图表，离线可用）: {OUT}")
 
 
 if __name__ == "__main__":
