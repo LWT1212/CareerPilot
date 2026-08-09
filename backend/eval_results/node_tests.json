@@ -1,0 +1,367 @@
+{
+  "total_ok": 36,
+  "total_all": 36,
+  "accuracy": 100.0,
+  "nodes": {
+    "coordinator": {
+      "node": "coordinator",
+      "ok": 20,
+      "total": 20,
+      "avg_s": 0.04,
+      "cases": [
+        {
+          "input": [
+            "帮我分析最近面试失败原因",
+            "interview"
+          ],
+          "ok": true,
+          "elapsed_s": 0.35,
+          "response": "",
+          "intent": "interview"
+        },
+        {
+          "input": [
+            "Redis持久化机制有哪些",
+            "knowledge"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "knowledge"
+        },
+        {
+          "input": [
+            "记录经验：Docker权限不足",
+            "experience"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "experience"
+        },
+        {
+          "input": [
+            "帮我生成项目README",
+            "document"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "document"
+        },
+        {
+          "input": [
+            "你好，今天天气怎么样",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "面试的薄弱点是什么",
+            "interview"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "interview"
+        },
+        {
+          "input": [
+            "更新一下我的简历",
+            "document"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "document"
+        },
+        {
+          "input": [
+            "我们踩过哪些坑",
+            "experience"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "experience"
+        },
+        {
+          "input": [
+            "谢谢",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "查一下项目里关于部署的资料",
+            "knowledge"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "knowledge"
+        },
+        {
+          "input": [
+            "",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "!!!",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "👍",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "What is Redis",
+            "knowledge"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "knowledge"
+        },
+        {
+          "input": [
+            "def foo(): return 42",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "帮我准备一下系统设计面试",
+            "interview"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "interview"
+        },
+        {
+          "input": [
+            "写一个PRD文档",
+            "document"
+          ],
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "",
+          "intent": "document"
+        },
+        {
+          "input": [
+            "聊聊最近的技术趋势",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "我们决定用PostgreSQL",
+            "chat"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "chat"
+        },
+        {
+          "input": [
+            "帮我查GitHub上fastapi仓库",
+            "knowledge"
+          ],
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "",
+          "intent": "knowledge"
+        }
+      ]
+    },
+    "experience": {
+      "node": "experience",
+      "ok": 5,
+      "total": 5,
+      "avg_s": 0.03,
+      "cases": [
+        {
+          "input": "沉淀这个经验：接口超时，原因是没设timeout，解决是加参",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "call\n{\"name\": \"save_experience\", \"arguments\": {\"ti",
+          "intent": ""
+        },
+        {
+          "input": "看下项目最近的经验",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "call\n{\"name\": \"get_recent_experiences\", \"arguments",
+          "intent": ""
+        },
+        {
+          "input": "记录一个bug：内存泄漏",
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "<call>save_experience({\"title\": \"内存泄漏\", \"content\":",
+          "intent": ""
+        },
+        {
+          "input": "我们有没有遇到过部署问题",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "call\nget_recent_experiences\n{\"keywords\": [\"部署\"], \"",
+          "intent": ""
+        },
+        {
+          "input": "把今天的踩坑记录一下",
+          "ok": true,
+          "elapsed_s": 0.04,
+          "response": "好的！请告诉我今天具体踩了什么坑？为了方便日后回顾，建议包含以下信息：\n\n1. **遇到了什么问题*",
+          "intent": ""
+        }
+      ]
+    },
+    "knowledge": {
+      "node": "knowledge",
+      "ok": 3,
+      "total": 3,
+      "avg_s": 0.02,
+      "cases": [
+        {
+          "input": "根据知识库，Docker怎么部署",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "call\n{\"name\": \"search_project_knowledge\", \"argumen",
+          "intent": ""
+        },
+        {
+          "input": "查一下GitHub上langchain-ai/langcha",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "call\n{\"name\": \"github_repo_info\", \"arguments\": {\"r",
+          "intent": ""
+        },
+        {
+          "input": "搜索最新的Python版本",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "call\n{\"name\": \"web_search\", \"arguments\": {\"query\":",
+          "intent": ""
+        }
+      ]
+    },
+    "interview": {
+      "node": "interview",
+      "ok": 3,
+      "total": 3,
+      "avg_s": 0.02,
+      "cases": [
+        {
+          "input": "分析一下面试情况",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "call\n{\"name\": \"get_interview_stats\", \"arguments\": ",
+          "intent": ""
+        },
+        {
+          "input": "面试薄弱点是什么",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "<tool>\n{\"name\": \"get_interview_stats\", \"arguments\"",
+          "intent": ""
+        },
+        {
+          "input": "总结面试表现",
+          "ok": true,
+          "elapsed_s": 0.02,
+          "response": "callget_interview_stats{}",
+          "intent": ""
+        }
+      ]
+    },
+    "document": {
+      "node": "document",
+      "ok": 2,
+      "total": 2,
+      "avg_s": 0.03,
+      "cases": [
+        {
+          "input": "帮我生成README文档",
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "<save_document>...` 的伪代码，或者假设系统能识别。\n为了安全起见，我会生成 Ma",
+          "intent": ""
+        },
+        {
+          "input": "看看项目有没有PRD",
+          "ok": true,
+          "elapsed_s": 0.03,
+          "response": "请问您具体指的是哪个项目呢？目前您还没有提供具体的项目名称或相关背景信息。\n\n如果您需要，我可以为您",
+          "intent": ""
+        }
+      ]
+    },
+    "chat": {
+      "node": "chat",
+      "ok": 3,
+      "total": 3,
+      "avg_s": 0.0,
+      "cases": [
+        {
+          "input": "你好",
+          "ok": true,
+          "elapsed_s": 0.0,
+          "response": "你好！我是 CareerPilot AI 助手。很高兴与你交流！\n\n无论是探讨技术难题、讨论代码实现",
+          "intent": ""
+        },
+        {
+          "input": "介绍一下你自己",
+          "ok": true,
+          "elapsed_s": 0.0,
+          "response": "你好！我是 **CareerPilot AI 助手**。我的主要使命是陪伴和帮助开发者进行深度的技术",
+          "intent": ""
+        },
+        {
+          "input": "最近有什么新技术吗",
+          "ok": true,
+          "elapsed_s": 0.0,
+          "response": "你好！我是 CareerPilot。技术领域的发展日新月异，特别是过去一年里，很多技术从“概念验证”",
+          "intent": ""
+        }
+      ]
+    }
+  }
+}
