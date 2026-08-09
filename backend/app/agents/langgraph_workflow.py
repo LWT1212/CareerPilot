@@ -36,14 +36,18 @@ class AgentState(TypedDict):
 # ============ 执行记录 ============
 
 def _record_execution(db, agent_type: str, input_data: dict,
-                      output_data: dict, duration_ms: int, status: str = "success"):
-    """记录Agent执行过程到数据库（含token用量）"""
+                      output_data: dict, duration_ms: int, status: str = "success",
+                      tokens: dict = None):
+    """记录Agent执行过程到数据库（含token用量）
+    tokens: 该节点自己的token用量（调用LLM后立即捕获，避免全局覆盖）
+    """
     if db is None:
         return
     try:
-        # 从LLM服务取最近一次token用量（评测可观测性）
-        from app.services.llm_service import get_last_usage
-        tokens = get_last_usage()
+        # 若未显式传入，则用全局最近一次（兜底）
+        if tokens is None:
+            from app.services.llm_service import get_last_usage
+            tokens = get_last_usage()
 
         exec_record = AgentExecution(
             agent_type=agent_type,
@@ -95,7 +99,13 @@ async def coordinator_node(state: AgentState) -> AgentState:
         intent_result = await structured_completion(
             IntentOutput,
             state["message"],
-            "判断用户消息的意图：knowledge=技术知识/查资料, experience=记录查询经验, interview=面试分析, document=生成文档, chat=普通对话。project_related=是否涉及项目内数据。"
+            "判断用户消息的意图（注意边界）:\n"
+            "- knowledge: 技术知识问题/查外部资料/查GitHub\n"
+            "- experience: 记录或查询开发经验/bug/踩坑\n"
+            "- interview: 面试分析/面试题/薄弱点\n"
+            "- document: 生成/更新项目文档(README/PRD/简历)\n"
+            "- chat: 普通对话/回顾项目历史决策(如'数据库怎么选的')\n"
+            "注意: '查看项目里某文档是否存在'归document，'查知识库资料'归knowledge，'问之前定过的技术决策'归chat(靠记忆回答)。project_related=是否涉及项目内数据。"
         )
         intent = intent_result.intent
         confidence = intent_result.confidence
@@ -106,10 +116,12 @@ async def coordinator_node(state: AgentState) -> AgentState:
         print(f"意图识别失败: {e}")
         intent = "chat"
 
+    from app.services.llm_service import get_last_usage
     _record_execution(state.get("db"), "coordinator",
                       {"message": state["message"]},
                       {"intent": intent},
-                      int((time.time() - start) * 1000))
+                      int((time.time() - start) * 1000),
+                      tokens=get_last_usage())
     return {"intent": intent}
 
 

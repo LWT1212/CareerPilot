@@ -127,7 +127,10 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
     skill = skills_manager.match(message_data.content)
 
     if skill:
-        # 命中Skill → 执行Skill作为回复
+        # 命中Skill → 执行Skill作为回复（记录到agent_executions，缺陷5修复）
+        from app.models.agent_execution import AgentExecution
+        import time as _time
+        _t0 = _time.time()
         try:
             ai_content = await skills_manager.execute(skill.name, {
                 "message": message_data.content,
@@ -136,10 +139,34 @@ async def send(chat_id: str, message_data: MessageCreate, db: Session = Depends(
                 "chat_history": history,
             })
             agent_used = f"skill:{skill.name}"
+            # 记录skill执行trace
+            try:
+                from app.services.llm_service import get_last_usage
+                db.add(AgentExecution(
+                    agent_type=f"skill:{skill.name}",
+                    input_data={"message": message_data.content[:100]},
+                    output_data={"response_preview": str(ai_content)[:200], "tokens": get_last_usage()},
+                    duration_ms=int((_time.time() - _t0) * 1000),
+                    status="success",
+                ))
+                db.commit()
+            except Exception as e:
+                print(f"skill trace记录失败: {e}")
         except Exception as e:
             print(f"Skill执行失败: {e}")
             ai_content = "（技能执行失败，请重试）"
             agent_used = "skill_error"
+            try:
+                db.add(AgentExecution(
+                    agent_type=f"skill:{skill.name}",
+                    input_data={"message": message_data.content[:100]},
+                    output_data={"error": str(e)[:200]},
+                    duration_ms=int((_time.time() - _t0) * 1000),
+                    status="failed",
+                ))
+                db.commit()
+            except Exception:
+                pass
     else:
         # 未命中Skill → 走LangGraph多智能体
         try:

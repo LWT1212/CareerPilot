@@ -76,13 +76,14 @@ async def chat_completion(history: list, user_message: str, system_prompt: str =
     """
     一次性获取 LLM 回复（非流式，带Redis缓存）
     相同请求命中缓存则直接返回，省token和时间
+
+    缓存key设计: 只基于 system_prompt + 用户消息（不依赖history）
+    原因: 聊天过程中history会不断变化，若key含history则永远无法命中（评测发现缺陷4）
     """
     from app.services.redis_service import get_llm_cache, set_llm_cache
 
-    # 生成缓存用的消息文本（含系统提示词，保证一致性）
+    # 缓存key：仅 system_prompt + 用户消息（历史不参与，保证可命中）
     cache_text = f"{system_prompt}|{user_message}"
-    for msg in history[-6:]:
-        cache_text += f"|{msg['role']}:{msg['content'][:100]}"
 
     # 1. 查缓存
     cached = get_llm_cache(settings.LLM_PROVIDER, settings.OPENAI_MODEL or settings.OLLAMA_MODEL, cache_text)
