@@ -126,3 +126,44 @@
 
 - 修复 Document content 为空缺陷
 - 继续: Tool Calling专项 / MCP / Memory / 降级 / 性能 / Redis
+
+---
+
+## Tool Calling 评测（层面2，88%）
+
+**结果文件**: scripts/eval/results/tool_calling_eval.json
+
+| 指标 | 值 |
+|------|-----|
+| Tool Selection Accuracy | 7/8 = 88% |
+| 整体通过率 | 7/8 = 88% |
+
+### 用例明细
+
+| 用例 | 期望工具 | 实际 | 结果 |
+|------|----------|------|------|
+| 沉淀经验×2 | save_experience | skill/tool 路径 | ✅ |
+| 看最近经验 | get_recent_experiences | experience(tool:get_recent_experiences) | ✅ |
+| 面试统计 | get_interview_stats | interview(tool:get_interview_stats) | ✅ |
+| 生成PRD | save_document | document(tool:save_document) | ✅ |
+| 看README | get_document | knowledge(tool:search_project_knowledge) | ❌ |
+| GitHub仓库 | github_repo_info | knowledge(tool:github_repo_info) | ✅ |
+| Web搜索 | web_search | knowledge(tool:web_search) | ✅ |
+
+### 步骤级指标（每次请求的trace）
+
+| 步骤 | 平均耗时 | 平均token | 说明 |
+|------|----------|-----------|------|
+| coordinator | 0ms（Redis缓存命中）| 245tok | 意图识别缓存生效 |
+| tool执行 | 3670ms | 245tok | 实际工具调用 |
+
+### 🐛 发现的缺陷2: get_document 路由偏差
+
+"看看项目有没有README" 被 Coordinator 识别为 knowledge（查知识库），而不是 document（查文档）。
+- **影响**: 文档查询类请求可能走错 Agent
+- **根因**: 意图识别对"查看文档"类请求与"查知识"区分不清
+- **建议**: 优化意图识别提示词，区分"查知识库"vs"查项目文档"
+
+### 🐛 发现的缺陷3: token 统计不完整
+
+coordinator 的 token 显示 245（非0）但工具步骤也是245——每次都是同一个值，说明 `get_last_usage()` 记录的是"最后一次LLM调用"的usage，多步骤时可能被覆盖/重复。需按节点分别记录。

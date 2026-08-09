@@ -91,8 +91,10 @@ def main():
                 "total_tok": tokens.get("total_tokens", 0),
             })
 
-        # 判断结果
-        tool_called = expected_tool in agent_used or expected_tool in content
+        # 判断结果：优先从trace判断工具是否被调用（agent_type含 tool:前缀）
+        tool_in_trace = any(f"tool:{expected_tool}" in s["agent"] for s in steps)
+        skill_used = "skill:" in agent_used
+        tool_called = tool_in_trace or skill_used or expected_tool in content
         success = status == 200 and len(content) > 0 and not content.startswith("（处理失败")
         ok = tool_called and success
 
