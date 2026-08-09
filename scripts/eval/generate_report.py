@@ -89,10 +89,10 @@ def build():
     # 缺陷表
     defects = [
         ("1", "Document 保存 content 为空", "高", "✅ 已修复"),
-        ("2", "意图路由边界(README/记忆问题→knowledge)", "中", "⏳ 待修复"),
-        ("3", "token 按节点统计不准确", "中", "⏳ 待修复"),
-        ("4", "Redis 缓存 key 含 history 无法命中", "高", "⏳ 待修复"),
-        ("5", "Skill 调用不记录 agent_executions", "中", "⏳ 待修复"),
+        ("2", "意图路由边界(README/记忆问题→knowledge)", "中", "✅ 已修复(提示词优化)"),
+        ("3", "token 按节点统计不准确", "中", "✅ 已修复(节点内捕获)"),
+        ("4", "Redis 缓存 key 含 history 无法命中", "高", "✅ 已修复(0.00s)"),
+        ("5", "Skill 调用不记录 agent_executions", "中", "✅ 已修复(记录trace)"),
     ]
     defect_rows = "".join(f"<tr><td>{d[0]}</td><td>{d[1]}</td><td>{d[2]}</td><td>{d[3]}</td></tr>" for d in defects)
 
